@@ -1,0 +1,158 @@
+import os
+import pymysql
+import signal
+import atexit
+from pymysqlreplication import BinLogStreamReader
+from pymysqlreplication.row_event import (
+    WriteRowsEvent,
+    UpdateRowsEvent,
+    DeleteRowsEvent
+)
+
+# 源 MySQL 数据库设置
+source_mysql_settings = {
+    "host": "192.168.188.197",
+    "port": 3307,
+    "user": "admin",
+    "passwd": "123456",
+    "database": "test",
+    "charset": "utf8"
+}
+
+# 目标 MySQL 数据库设置
+target_mysql_settings = {
+    "host": "192.168.198.239",
+    "port": 3336,
+    "user": "admin",
+    "passwd": "123456",
+    "database": "test",
+    "charset": "utf8"
+}
+
+# 保存 binlog 位置和文件名
+def save_binlog_pos(binlog_file, binlog_pos):
+    current_binlog_file = binlog_file
+    if binlog_file is not None:
+        with open('binlog_info.txt', 'w') as f:
+            f.write('{}\n{}'.format(current_binlog_file, binlog_pos))
+        print('Binlog position ({}, {}) saved.'.format(current_binlog_file, binlog_pos))
+    else:
+        with open('binlog_info.txt', 'w') as f:
+            f.write('{}\n{}'.format(current_binlog_file, binlog_pos))
+        print('Binlog position ({}, {}) updated.'.format(current_binlog_file, binlog_pos))
+
+
+# 读取上次保存的 binlog 位置和文件名
+def load_binlog_pos():
+    try:
+        with open('binlog_info.txt', 'r') as f:
+            binlog_file, binlog_pos = f.read().strip().split('\n')
+    except Exception as e:
+        print('Load binlog position failure:', e)
+        binlog_file, binlog_pos = "mysql-bin.049623", 4 # 设置默认值为 mysql-bin.000001 和 4
+
+    return binlog_file, int(binlog_pos)
+
+
+def exit_handler(stream, current_binlog_file, binlog_pos):
+    stream.close()
+    save_binlog_pos(current_binlog_file, binlog_pos)
+
+# 在程序被终止时保存 binlog 位置
+def save_binlog_pos_on_termination(signum, frame):
+    save_binlog_pos(current_binlog_file, binlog_pos)
+    quit_program()
+
+# 退出程序时保存当前的 binlog 文件名和位置点
+def quit_program():
+    stream.close()
+    target_conn.close()
+    exit(0)
+
+# 建立连接
+target_conn = pymysql.connect(**target_mysql_settings)
+
+saved_pos = load_binlog_pos()
+
+stream = BinLogStreamReader(
+    connection_settings=source_mysql_settings,
+    server_id=413346,  #设置源MySQL Server-Id
+    blocking=True,
+    resume_stream=True,
+    only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
+    log_file=saved_pos[0],
+    log_pos=saved_pos[1]
+)
+
+# 循环遍历解析出来的行事件并存入SQL语句中
+def process_rows_event(binlogevent, stream):
+    for row in binlogevent.rows:
+        if isinstance(binlogevent, WriteRowsEvent):
+            sql = "INSERT INTO {}({}) VALUES ({})".format(
+                binlogevent.table,
+                '`' + '`,`'.join(list(row["values"].keys())) + '`',
+                ','.join(["'%s'" % str(i) for i in list(row["values"].values())])
+            )
+            #print(sql)
+            try:
+                with target_conn.cursor() as cursor:
+                    cursor.execute(sql)
+                    target_conn.commit()
+            except Exception as e:
+                print(f"Failed to execute SQL: {sql}")
+                print(f"Error message: {e}")
+        elif isinstance(binlogevent, UpdateRowsEvent):
+            sql = "UPDATE {} SET {} WHERE {}".format(
+                binlogevent.table,
+                ','.join(["`{}`='{}'".format(k, v) for k, v in row["after_values"].items()]),
+                ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["before_values"].items()])
+            )
+            #print(sql)
+            try:
+                with target_conn.cursor() as cursor:
+                   cursor.execute(sql)
+                   target_conn.commit()
+            except Exception as e:
+                print(f"Failed to execute SQL: {sql}")
+                print(f"Error message: {e}")
+        elif isinstance(binlogevent, DeleteRowsEvent):
+            sql = "DELETE FROM {} WHERE {}".format(
+                binlogevent.table,
+                ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["values"].items()])
+            )
+            #print(sql)
+            try:
+                with target_conn.cursor() as cursor:
+                    cursor.execute(sql)
+                    target_conn.commit()
+            except Exception as e:
+                print(f"Failed to execute SQL: {sql}")
+                print(f"Error message: {e}")
+
+    return binlogevent.packet.log_pos
+
+
+# 循环遍历解析出来的行事件并存入SQL语句中
+while True:
+    try:
+        for binlogevent in stream:
+            current_binlog_file = os.path.basename(stream.log_file)
+            binlog_pos = process_rows_event(binlogevent, stream)
+            save_binlog_pos(current_binlog_file, binlog_pos)
+
+    except KeyboardInterrupt:
+        save_binlog_pos(current_binlog_file, binlog_pos)
+        break
+
+    except pymysql.err.OperationalError as e:
+        print("MySQL Error {}: {}".format(e.args[0], e.args[1]))
+
+# 在程序退出时保存 binlog 位置
+atexit.register(exit_handler, stream, current_binlog_file, binlog_pos)
+
+# 接收 SIGTERM 和 SIGINT 信号
+signal.signal(signal.SIGTERM, save_binlog_pos_on_termination)
+signal.signal(signal.SIGINT, save_binlog_pos_on_termination)
+
+# 关闭连接
+atexit.register(target_conn.close)

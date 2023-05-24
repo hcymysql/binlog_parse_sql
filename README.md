@@ -1,5 +1,5 @@
 # binlog_parse_sql
-将 binlog 解析为 SQL 并将其存入数据库
+解析MySQL binlog日志，将日志中的SQL语句提取出来，并输出成可执行的SQL文件，将其存入其他MySQL数据库
 
 ```shell> pip3 install pymysql mysql-replication  -i   "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 

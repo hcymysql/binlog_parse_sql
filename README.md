@@ -1,5 +1,12 @@
-# binlog_parse_sql
-解析MySQL binlog日志，将日志中的SQL语句提取出来，并输出成可执行的SQL文件，将其存入其他MySQL数据库
+从MySQL 8.0迁移到MariaDB 10.5时，binlog同步复制已经不兼容。
+
+1）若MariaDB是主库，MySQL是从库，在GTID模式下，从MariaDB同步复制数据时，GTID与MySQL不兼容，同步将报错。
+
+2）若MySQL是主库，MariaDB是从库，MariaDB无法从MySQL 8.0主库上复制，因为MySQL 8.0具有不兼容的二进制日志格式。
+
+需要借助binlog_parse_sql 工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
+
+-----------------------------------
 
 ```shell> pip3 install pymysql mysql-replication  -i   "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 

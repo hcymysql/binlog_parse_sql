@@ -13,17 +13,24 @@
 注：从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
 
 -----------------------------------
-
+1）安装： 
 ```shell> pip3 install pymysql mysql-replication  -i   "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 
-```shell> nohup python3 binlog_parse_sql.py &```
+2）前台运行
+```shell> python3 binlog_parse_sql.py```
 
-LookupError: unknown encoding: utf8mb3
-解决方案：
-https://github.com/julien-duponchelle/python-mysql-replication/issues/386
+3)后台运行
+```shell> nohup python3 binlog_parse_sql.py > output.file 2>&1 &```
+
+运行后如报错 LookupError: unknown encoding: utf8mb3
+
+解决方案
 
 ```
 /usr/local/python3/lib/python3.10/site-packages/pymysql/charset.py文件，增加如下：
 _charsets.add(Charset(256, "utf8mb3", "utf8mb3_general_ci", "Yes"))
 _charsets.add(Charset(257, "utf8mb3", "utf8mb3_bin", ""))
 ```
+
+参考如下链接：
+https://github.com/julien-duponchelle/python-mysql-replication/issues/386

@@ -15,7 +15,7 @@ from pymysqlreplication.event import GtidEvent
 
 
 #################修改以下配置配置信息#################
-# 源 MySQL 数据库设置
+# 源 MySQL 8.0 数据库设置
 source_mysql_settings = {
     "host": "192.168.198.239",
     "port": 3336,
@@ -32,7 +32,7 @@ source_server_id = 413336
 binlog_file = "mysql-bin.000004"
 binlog_pos = 7882
 
-# 目标 MySQL 数据库设置
+# 目标 MariaDB 数据库设置
 target_mysql_settings = {
     "host": "192.168.198.239",
     "port": 3306,

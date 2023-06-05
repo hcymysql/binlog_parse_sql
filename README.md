@@ -1,4 +1,8 @@
-从MySQL 8.0迁移到MariaDB 10.5时，binlog同步复制已经不兼容。
+由于 MariaDB 已经远离 MySQL，从MySQL 8.0迁移到MariaDB 10.5时，binlog同步复制已经不兼容。
+
+参考手册： https://mariadb.com/kb/en/mariadb-vs-mysql-compatibility/
+
+![image](https://s2.51cto.com/images/202306/d9f040596cfa78d7ca3022f68dc63d9b19bdf7.png?x-oss-process=image/watermark,size_14,text_QDUxQ1RP5Y2a5a6i,color_FFFFFF,t_30,g_se,x_10,y_10,shadow_20,type_ZmFuZ3poZW5naGVpdGk=/format,webp)
 
 1）若MariaDB是主库，MySQL是从库，在GTID模式下，从MariaDB同步复制数据时，GTID与MySQL不兼容，同步将报错。
 

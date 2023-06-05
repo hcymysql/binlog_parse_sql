@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import pymysql
 import signal
@@ -12,6 +14,7 @@ from pymysqlreplication.event import QueryEvent
 from pymysqlreplication.event import GtidEvent
 
 
+#################修改以下配置配置信息#################
 # 源 MySQL 数据库设置
 source_mysql_settings = {
     "host": "192.168.198.239",
@@ -25,6 +28,10 @@ source_mysql_settings = {
 #设置源MySQL Server-Id
 source_server_id = 413336
 
+#设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
+binlog_file = "mysql-bin.000004"
+binlog_pos = 7882
+
 # 目标 MySQL 数据库设置
 target_mysql_settings = {
     "host": "192.168.198.239",
@@ -34,6 +41,9 @@ target_mysql_settings = {
     "database": "hcy",
     "charset": "utf8"
 }
+
+#################以下代码不用修改#################
+
 
 # 保存 binlog 位置和文件名
 def save_binlog_pos(binlog_file, binlog_pos):
@@ -50,23 +60,28 @@ def save_binlog_pos(binlog_file, binlog_pos):
 
 # 读取上次保存的 binlog 位置和文件名
 def load_binlog_pos():
+    global binlog_file, binlog_pos
     try:
         with open('binlog_info.txt', 'r') as f:
             binlog_file, binlog_pos = f.read().strip().split('\n')
+    except FileNotFoundError:
+        binlog_file, binlog_pos = binlog_file, binlog_pos
     except Exception as e:
         print('Load binlog position failure:', e)
-        binlog_file, binlog_pos = "mysql-bin.000003", 4 # 设置默认值为 mysql-bin.000001 和 4
+        #binlog_file, binlog_pos = "mysql-bin.000003", 4 # 设置默认值为 mysql-bin.000001 和 4
+        binlog_file, binlog_pos = binlog_file, binlog_pos
 
     return binlog_file, int(binlog_pos)
 
 # 退出程序时保存当前的 binlog 文件名和位置点
 def exit_handler(stream, current_binlog_file, binlog_pos):
     stream.close()
-    save_binlog_pos(current_binlog_file, binlog_pos)
+    #save_binlog_pos(current_binlog_file, binlog_pos)
+    save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
 
 # 在程序被终止时保存当前的 binlog 文件名和位置点
 def save_binlog_pos_on_termination(signum, frame):
-    save_binlog_pos(current_binlog_file, binlog_pos)
+    save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
     quit_program()
 
 # 退出程序时保存当前的 binlog 文件名和位置点
@@ -86,7 +101,7 @@ stream = BinLogStreamReader(
     blocking=True,
     resume_stream=True,
     #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
-    only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
+    #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
 )
@@ -156,18 +171,33 @@ def process_rows_event(binlogevent, stream):
                     print(f"Failed to execute SQL: {sql}")
                     print(f"Error message: {e}")
 
-        return binlogevent.packet.log_pos
+        #return binlogevent.packet.log_pos
+        return binlogevent.packet.log_pos if hasattr(binlogevent, 'packet') else binlogevent.log_pos
 
 # 循环遍历解析出来的行事件并存入SQL语句中
 while True:
     try:
         for binlogevent in stream:
             current_binlog_file = os.path.basename(stream.log_file)
-            binlog_pos = process_rows_event(binlogevent, stream)
-            save_binlog_pos(current_binlog_file, binlog_pos)
+            try:
+                binlog_pos = process_rows_event(binlogevent, stream)
+            except AttributeError as e:
+                # RotateEvent事件无rows属性，需要重新获取当前的binlog文件名和位置点，然后更新BinLogStreamReader对象
+                saved_pos = load_binlog_pos()
+                stream.close()
+                stream = BinLogStreamReader(
+                    connection_settings=source_mysql_settings,
+                    server_id=source_server_id,
+                    blocking=True,
+                    resume_stream=True,
+                    log_file=saved_pos[0],
+                    log_pos=saved_pos[1]
+                )
+            else:
+                save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
 
     except KeyboardInterrupt:
-        save_binlog_pos(current_binlog_file, binlog_pos)
+        save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
         break
 
     except pymysql.err.OperationalError as e:

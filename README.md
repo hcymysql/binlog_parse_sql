@@ -21,7 +21,7 @@
 
 ```shell> python3 binlog_parse_sql.py```
 
-3) 后台运行
+3）后台运行
 
 ```shell> nohup python3 binlog_parse_sql.py > from_mysql_to_mariadb.log 2>&1 &```
 

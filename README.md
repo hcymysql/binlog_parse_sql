@@ -25,6 +25,8 @@
 
 ```shell> nohup python3 binlog_parse_sql.py > from_mysql_to_mariadb.log 2>&1 &```
 
+4）工具运行后，会生成binlog_info.txt文件，即实时保存已经解析过的binlog文件名和position位置点，以方便程序挂掉后的断点续传。
+
 运行后如报错 LookupError: unknown encoding: utf8mb3
 
 解决方案

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
 
 import os
 import pymysql

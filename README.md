@@ -4,7 +4,9 @@
 
 2）若MySQL是主库，MariaDB是从库，MariaDB无法从MySQL 8.0主库上复制，因为MySQL 8.0具有不兼容的二进制日志格式。
 
-需要借助binlog_parse_sql 工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
+需要借助binlog_parse_sql工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
+
+注：从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
 
 -----------------------------------
 

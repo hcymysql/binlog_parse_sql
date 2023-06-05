@@ -23,7 +23,7 @@
 
 3) 后台运行
 
-```shell> nohup python3 binlog_parse_sql.py > output.file 2>&1 &```
+```shell> nohup python3 binlog_parse_sql.py > from_mysql_to_mariadb.log 2>&1 &```
 
 运行后如报错 LookupError: unknown encoding: utf8mb3
 

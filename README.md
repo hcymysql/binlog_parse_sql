@@ -14,12 +14,15 @@
 
 -----------------------------------
 1）安装： 
-```shell> pip3 install pymysql mysql-replication  -i   "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
+
+```shell> pip3 install pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 
 2）前台运行
+
 ```shell> python3 binlog_parse_sql.py```
 
-3)后台运行
+3) 后台运行
+
 ```shell> nohup python3 binlog_parse_sql.py > output.file 2>&1 &```
 
 运行后如报错 LookupError: unknown encoding: utf8mb3

@@ -19,17 +19,19 @@ source_mysql_settings = {
     "charset": "utf8mb4",
 }
 
-"""
+#设置源MySQL Server-Id
+source_server_id = 413336
+
 # 目标 MySQL 数据库设置
 target_mysql_settings = {
     "host": "192.168.198.239",
-    "port": 3336,
-    "user": "admin",
-    "passwd": "123456",
-    "database": "test",
+    "port": 3306,
+    "user": "hcy",
+    "passwd": "hechunyang",
+    "database": "hcy",
     "charset": "utf8"
 }
-"""
+
 # 保存 binlog 位置和文件名
 def save_binlog_pos(binlog_file, binlog_pos):
     current_binlog_file = binlog_file
@@ -55,11 +57,12 @@ def load_binlog_pos():
     return binlog_file, int(binlog_pos)
 
 
+# 在程序退出时保存当前的 binlog 文件名和位置点
 def exit_handler(stream, current_binlog_file, binlog_pos):
     stream.close()
     save_binlog_pos(current_binlog_file, binlog_pos)
 
-# 在程序被终止时保存 binlog 位置
+# 在程序被终止时保存当前的 binlog 文件名和位置点
 def save_binlog_pos_on_termination(signum, frame):
     save_binlog_pos(current_binlog_file, binlog_pos)
     quit_program()
@@ -67,17 +70,17 @@ def save_binlog_pos_on_termination(signum, frame):
 # 退出程序时保存当前的 binlog 文件名和位置点
 def quit_program():
     stream.close()
-    #target_conn.close()
+    target_conn.close()
     exit(0)
 
 # 建立连接
-#target_conn = pymysql.connect(**target_mysql_settings)
+target_conn = pymysql.connect(**target_mysql_settings)
 
 saved_pos = load_binlog_pos()
 
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
-    server_id=413336,  #设置源MySQL Server-Id
+    server_id=source_server_id,  
     blocking=True,
     resume_stream=True,
     only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
@@ -99,7 +102,6 @@ def process_rows_event(binlogevent, stream):
                 ','.join(["'%s'" % str(i) for i in list(row["values"].values())])
             )
             print(sql)
-            """
             try:
                 with target_conn.cursor() as cursor:
                     cursor.execute(sql)
@@ -107,7 +109,7 @@ def process_rows_event(binlogevent, stream):
             except Exception as e:
                 print(f"Failed to execute SQL: {sql}")
                 print(f"Error message: {e}")
-            """
+
         elif isinstance(binlogevent, UpdateRowsEvent):
             sql = "UPDATE {} SET {} WHERE {}".format(
                 f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
@@ -115,7 +117,7 @@ def process_rows_event(binlogevent, stream):
                 ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["before_values"].items()])
             )
             print(sql)
-            """
+
             try:
                 with target_conn.cursor() as cursor:
                    cursor.execute(sql)
@@ -123,14 +125,14 @@ def process_rows_event(binlogevent, stream):
             except Exception as e:
                 print(f"Failed to execute SQL: {sql}")
                 print(f"Error message: {e}")
-            """
+
         elif isinstance(binlogevent, DeleteRowsEvent):
             sql = "DELETE FROM {} WHERE {}".format(
                 f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
                 ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["values"].items()])
             )
             print(sql)
-            """
+
             try:
                 with target_conn.cursor() as cursor:
                     cursor.execute(sql)
@@ -138,7 +140,7 @@ def process_rows_event(binlogevent, stream):
             except Exception as e:
                 print(f"Failed to execute SQL: {sql}")
                 print(f"Error message: {e}")
-            """
+
     return binlogevent.packet.log_pos
 
 

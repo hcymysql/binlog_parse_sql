@@ -30,8 +30,8 @@ source_mysql_settings = {
 source_server_id = 413336
 
 #设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
-binlog_file = "mysql-bin.000004"
-binlog_pos = 7882
+binlog_file = "mysql-bin.000001"
+binlog_pos = 4
 
 # 目标 MariaDB 数据库设置
 target_mysql_settings = {
@@ -101,7 +101,6 @@ stream = BinLogStreamReader(
     server_id=source_server_id,  
     blocking=True,
     resume_stream=True,
-    #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
     #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
@@ -113,9 +112,10 @@ def process_rows_event(binlogevent, stream):
         database_name = binlogevent.schema  # 获取数据库名
     else:
         database_name = None
-    
+
     if isinstance(binlogevent, QueryEvent):
         sql = binlogevent.query
+        print(sql)
         try:
             with target_conn.cursor() as cursor:
                 cursor.execute(sql)
@@ -144,7 +144,7 @@ def process_rows_event(binlogevent, stream):
             elif isinstance(binlogevent, UpdateRowsEvent):
                 sql = "UPDATE {} SET {} WHERE {}".format(
                     f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
-                    ','.join(["`{}`='{}'".format(k, v) for k, v in row["after_values"].items()]),
+                    ','.join([f"`{k}`={'NULL' if v is None else f'{v}'}" for k, v in row["after_values"].items()]),
                     ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["before_values"].items()])
                 )
                 print(sql)
@@ -171,34 +171,26 @@ def process_rows_event(binlogevent, stream):
                 except Exception as e:
                     print(f"Failed to execute SQL: {sql}")
                     print(f"Error message: {e}")
+                    
+    return binlogevent.packet.log_pos
 
-        #return binlogevent.packet.log_pos
-        return binlogevent.packet.log_pos if hasattr(binlogevent, 'packet') else binlogevent.log_pos
 
 # 循环遍历解析出来的行事件并存入SQL语句中
 while True:
     try:
         for binlogevent in stream:
-            current_binlog_file = os.path.basename(stream.log_file)
+            #print(f'binlog: {stream.log_file}, positon: {stream.log_pos}')
+            current_binlog_file = stream.log_file
             try:
                 binlog_pos = process_rows_event(binlogevent, stream)
+                #print(f'binlog_pos :=====> {binlog_pos}')
             except AttributeError as e:
-                # RotateEvent事件无rows属性，需要重新获取当前的binlog文件名和位置点，然后更新BinLogStreamReader对象
-                saved_pos = load_binlog_pos()
-                stream.close()
-                stream = BinLogStreamReader(
-                    connection_settings=source_mysql_settings,
-                    server_id=source_server_id,
-                    blocking=True,
-                    resume_stream=True,
-                    log_file=saved_pos[0],
-                    log_pos=saved_pos[1]
-                )
+                save_binlog_pos(current_binlog_file, binlog_pos)
             else:
-                save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
+                save_binlog_pos(current_binlog_file, binlog_pos)
 
     except KeyboardInterrupt:
-        save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
+        save_binlog_pos(current_binlog_file, binlog_pos)
         break
 
     except pymysql.err.OperationalError as e:

@@ -8,7 +8,7 @@
 
 2）若MySQL是主库，MariaDB是从库，MariaDB无法从MySQL 8.0主库上复制，因为MySQL 8.0具有不兼容的二进制日志格式。
 
-需要借助binlog_parse_sql工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
+需要借助binlog_parse_queue工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
 
 #### 使用场景：
 
@@ -31,11 +31,11 @@ SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样�
 
 2）前台运行
 
-```shell> python3 binlog_parse_sql.py```
+```shell> python3 binlog_parse_queue.py```
 
 3）后台运行
 
-```shell> nohup python3 binlog_parse_sql.py > from_mysql_to_mariadb.log 2>&1 &```
+```shell> nohup python3 binlog_parse_queue.py > from_mysql_to_mariadb.log 2>&1 &```
 
 4）工具运行后，会生成binlog_info.txt文件，即实时保存已经解析过的binlog文件名和position位置点，以方便程序挂掉后的断点续传。
 

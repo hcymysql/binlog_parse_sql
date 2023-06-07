@@ -16,7 +16,15 @@
 
 2）数据恢复（研发手抖误删除一张表，通过历史全量恢复+binlog增量恢复）
 
+#### 原理：
+
+将解析 binlog 和执行 SQL 语句两个过程改成分别由两个线程来执行。
+
+其中，解析 binlog 的线程每次解析完一个事件后通过队列将 SQL 语句传给 SQL 执行线程，
+SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样就保证了 SQL 语句的串行执行。
+
 -----------------------------------
+#### 使用：
 1）安装： 
 
 ```shell> pip3 install pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```

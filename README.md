@@ -33,6 +33,8 @@ SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样�
 
 ```shell> python3 binlog_parse_queue.py```
 
+![image](https://s2.51cto.com/images/202306/b3c971e530888984170795dda364cf2a683235.png?x-oss-process=image/watermark,size_14,text_QDUxQ1RP5Y2a5a6i,color_FFFFFF,t_30,g_se,x_10,y_10,shadow_20,type_ZmFuZ3poZW5naGVpdGk=/format,webp)
+
 3）后台运行
 
 ```shell> nohup python3 binlog_parse_queue.py > from_mysql_to_mariadb.log 2>&1 &```

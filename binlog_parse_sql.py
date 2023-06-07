@@ -69,7 +69,6 @@ def load_binlog_pos():
         binlog_file, binlog_pos = binlog_file, binlog_pos
     except Exception as e:
         print('Load binlog position failure:', e)
-        #binlog_file, binlog_pos = "mysql-bin.000003", 4 # 设置默认值为 mysql-bin.000001 和 4
         binlog_file, binlog_pos = binlog_file, binlog_pos
 
     return binlog_file, int(binlog_pos)

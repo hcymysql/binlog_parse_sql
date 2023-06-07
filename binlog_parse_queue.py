@@ -5,6 +5,7 @@ import os
 import pymysql
 import signal
 import atexit
+import time
 from queue import Queue
 from threading import Thread
 from pymysqlreplication import BinLogStreamReader
@@ -47,7 +48,6 @@ target_mysql_settings = {
 
 #################以下代码不用修改#################
 
-
 # 保存 binlog 位置和文件名
 def save_binlog_pos(binlog_file, binlog_pos):
     current_binlog_file = binlog_file
@@ -60,7 +60,6 @@ def save_binlog_pos(binlog_file, binlog_pos):
             f.write('{}\n{}'.format(current_binlog_file, binlog_pos))
         print('Binlog position ({}, {}) updated.'.format(current_binlog_file, binlog_pos))
 
-
 # 读取上次保存的 binlog 位置和文件名
 def load_binlog_pos():
     global binlog_file, binlog_pos
@@ -71,7 +70,6 @@ def load_binlog_pos():
         binlog_file, binlog_pos = binlog_file, binlog_pos
     except Exception as e:
         print('Load binlog position failure:', e)
-        #binlog_file, binlog_pos = "mysql-bin.000003", 4 # 设置默认值为 mysql-bin.000001 和 4
         binlog_file, binlog_pos = binlog_file, binlog_pos
 
     return binlog_file, int(binlog_pos)
@@ -111,6 +109,9 @@ def sql_worker():
                 cursor.execute(sql)
                 target_conn.commit()
                 print(f"success to execute SQL: {sql}")
+                current_timestamp = int(time.time())
+                Seconds_Behind_Master = current_timestamp - event_time
+                print(f"入库延迟时间为：{Seconds_Behind_Master} （单位秒）")
         except Exception as e:
             print(f"Failed to execute SQL: {sql}")
             print(f"Error message: {e}")
@@ -121,7 +122,6 @@ def sql_worker():
 sql_thread = Thread(target=sql_worker, daemon=True)
 sql_thread.start()
 
-# https://python-mysql-replication.readthedocs.io/en/latest/binlogstream.html
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
     server_id=source_server_id,  
@@ -138,6 +138,9 @@ def process_rows_event(binlogevent, stream):
         database_name = binlogevent.schema  # 获取数据库名
     else:
         database_name = None
+
+    global event_time
+    event_time = binlogevent.timestamp
 
     if isinstance(binlogevent, QueryEvent):
         sql = binlogevent.query

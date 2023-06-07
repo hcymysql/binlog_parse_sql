@@ -71,11 +71,9 @@ def load_binlog_pos():
         binlog_file, binlog_pos = binlog_file, binlog_pos
     except Exception as e:
         print('Load binlog position failure:', e)
-        #binlog_file, binlog_pos = "mysql-bin.000003", 4 # 设置默认值为 mysql-bin.000001 和 4
         binlog_file, binlog_pos = binlog_file, binlog_pos
 
     return binlog_file, int(binlog_pos)
-
 
 # 退出程序时保存当前的 binlog 文件名和位置点
 def exit_handler(stream, current_binlog_file, binlog_pos):
@@ -129,6 +127,8 @@ stream = BinLogStreamReader(
     #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
+    #stop_position=<stop_position>,
+    #stop_file=<stop_file>
 )
 
 # 循环遍历解析出来的行事件并存入SQL语句中

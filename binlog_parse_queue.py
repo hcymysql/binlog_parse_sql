@@ -121,6 +121,7 @@ def sql_worker():
 sql_thread = Thread(target=sql_worker, daemon=True)
 sql_thread.start()
 
+# https://python-mysql-replication.readthedocs.io/en/latest/binlogstream.html
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
     server_id=source_server_id,  

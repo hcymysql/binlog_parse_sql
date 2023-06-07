@@ -158,10 +158,29 @@ def process_rows_event(binlogevent, stream):
                     print(f"Error message: {e}")
     
             elif isinstance(binlogevent, DeleteRowsEvent):
+                '''
                 sql = "DELETE FROM {} WHERE {}".format(
                     f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
                     ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["values"].items()])
                 )
+                '''
+                set_values = []
+                for k, v in row["after_values"].items():
+                    if isinstance(v, str):
+                        set_values.append(f"`{k}`='{v}'")
+                    else:
+                        set_values.append(f"`{k}`={v}")
+                set_clause = ','.join(set_values)
+
+                where_values = []
+                for k, v in row["before_values"].items():
+                    if isinstance(v, str):
+                        where_values.append(f"`{k}`='{v}'")
+                    else:
+                        where_values.append(f"`{k}`={v}")
+                where_clause = ' AND '.join(where_values)
+
+                sql = f"UPDATE {database_name}.{binlogevent.table} SET {set_clause} WHERE {where_clause}"
                 print(sql)
     
                 try:

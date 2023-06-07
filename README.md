@@ -10,7 +10,11 @@
 
 需要借助binlog_parse_sql工具，将binlog解析并生成SQL语句，反向插入MariaDB数据库里。
 
-注：从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
+#### 使用场景：
+
+1）从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
+
+2）数据恢复（研发手抖误删除一张表，通过历史全量恢复+binlog增量恢复）
 
 -----------------------------------
 1）安装： 

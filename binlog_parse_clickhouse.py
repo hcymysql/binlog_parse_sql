@@ -186,6 +186,7 @@ def process_rows_event(binlogevent, stream):
                         where_values.append(f"`{k}`={v}")
                 where_clause = ' AND '.join(where_values)
 
+                # https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse
                 sql = f"ALTER TABLE `{binlogevent.table}` UPDATE {set_clause} WHERE {where_clause}"
                 print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列

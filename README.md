@@ -1,3 +1,5 @@
+![image](https://s2.51cto.com/images/202306/13bd1a445f0874cc06e869444d718a0f2cf32f.png?x-oss-process=image/watermark,size_14,text_QDUxQ1RP5Y2a5a6i,color_FFFFFF,t_30,g_se,x_10,y_10,shadow_20,type_ZmFuZ3poZW5naGVpdGk=/format,webp)
+
 由于 MariaDB 已经远离 MySQL，从MySQL 8.0迁移到MariaDB 10.5时，binlog同步复制已经不兼容。
 
 参考手册： https://mariadb.com/kb/en/mariadb-vs-mysql-compatibility/

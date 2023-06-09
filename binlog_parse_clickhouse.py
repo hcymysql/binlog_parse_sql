@@ -126,7 +126,7 @@ stream = BinLogStreamReader(
     server_id=source_server_id,  
     blocking=True,
     resume_stream=True,
-    #only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
+    only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
 )

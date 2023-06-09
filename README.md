@@ -30,6 +30,7 @@ SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样�
 1）安装： 
 
 ```shell> pip3 install pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
+
 ```shell> pip3 install clickhouse-driver -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 
 注：clickhouse_driver库需要调用ssl，由于python3.10之后版本不在支持libressl使用ssl，需要用openssl1.1.1版本或者更高版本

@@ -74,6 +74,8 @@ https://blog.csdn.net/mdh17322249/article/details/123966953
 #### 2）MySQL表结构转换为ClickHouse表结构
 ``` shell> vim mysql_to_clickhose_schema.py（修改脚本里的配置信息）```
 
+注：mysql_to_clickhose_schema_test.py（该工具仅为单表测试使用）
+
 运行
 
 ``` shell> python3 mysql_to_clickhose_schema.py```

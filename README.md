@@ -14,7 +14,7 @@
 
 #### 使用场景：
 
-1）从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB
+1）从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB（ETL抽数据工具）
 
 2）数据恢复（研发手抖误删除一张表，通过历史全量恢复+binlog增量恢复）
 
@@ -28,18 +28,10 @@
 SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样就保证了 SQL 语句的串行执行。
 
 -----------------------------------
-#### 使用：
+#### MariaDB使用：
 1）安装： 
 
 ```shell> pip3 install pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
-
-```shell> pip3 install clickhouse-driver -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
-
-注：clickhouse_driver库需要调用ssl，由于python3.10之后版本不在支持libressl使用ssl，需要用openssl1.1.1版本或者更高版本
-
-参见：python3.10编译安装报SSL失败解决方法
-
-https://blog.csdn.net/mdh17322249/article/details/123966953
 
 2）前台运行
 
@@ -66,3 +58,38 @@ _charsets.add(Charset(257, "utf8mb3", "utf8mb3_bin", ""))
 
 参考如下链接：
 https://github.com/julien-duponchelle/python-mysql-replication/issues/386
+
+##############################################################################################
+#### ClickHouse使用：
+1）安装： 
+
+```shell> pip3 install clickhouse-driver -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
+
+注：clickhouse_driver库需要调用ssl，由于python3.10之后版本不在支持libressl使用ssl，需要用openssl1.1.1版本或者更高版本
+
+参见：python3.10编译安装报SSL失败解决方法
+
+https://blog.csdn.net/mdh17322249/article/details/123966953
+
+2）#### MySQL表结构转换为ClickHouse表结构
+``` shell> vim mysql_to_clickhose_schema.py（修改脚本里的配置信息）```
+
+运行
+``` shell> python3 mysql_to_clickhose_schema.py```
+
+原理：连接MySQL获取表结构schema，然后在ClickHouse里执行建表语句。
+
+3）#### binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse
+``` shell> vim binlog_parse_clickhouse.py（修改脚本里的配置信息）```
+
+前台运行
+
+```shell> python3 binlog_parse_clickhouse.py```
+
+后台运行
+
+```shell> nohup python3 binlog_parse_clickhouse.py > from_mysql_to_clickhouse.log 2>&1 &```
+
+
+
+

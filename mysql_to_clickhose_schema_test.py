@@ -1,8 +1,8 @@
+#!/usr/bin/env python3
+# MySQL表结构转换为ClickHouse表结构，该工具仅为单表测试使用。
 import pymysql
 import re
 from clickhouse_driver import Client
-
-# MySQL表结构转换为ClickHouse表结构，该工具仅为单表测试使用。
 
 def convert_field_type(field_type):
     """
@@ -67,7 +67,7 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, mysql_table, clickho
     # 执行SQL语句
     clickhouse_cursor = clickhouse_conn.execute(create_statement)
 
-	# 输出ClickHouse表结构
+    # 输出ClickHouse表结构
     print(f"ClickHouse create statement: {create_statement}")
 
 if __name__ == "__main__":
@@ -83,5 +83,5 @@ if __name__ == "__main__":
     # 连接ClickHouse数据库
     clickhouse_conn = Client(host='192.168.176.204',port=9000,user='hechunyang',password='123456',database='hcy')
 
-    # 转化表结构
+    # 转化表结构（将MySQL的hcy库的user表 转换为 ClickHouse的hcy库的user表）
     convert_mysql_to_clickhouse(mysql_conn, "hcy", "user", clickhouse_conn, "hcy")

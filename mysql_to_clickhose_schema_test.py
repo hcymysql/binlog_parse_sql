@@ -8,6 +8,7 @@ def convert_field_type(field_type):
     """
     将MySQL字段类型转换为ClickHouse字段类型
     """
+    field_type = field_type.split()[0]
     if "tinyint" in field_type:
         return "Int8"
     elif "smallint" in field_type:

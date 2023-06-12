@@ -71,15 +71,16 @@ https://github.com/julien-duponchelle/python-mysql-replication/issues/386
 
 https://blog.csdn.net/mdh17322249/article/details/123966953
 
-2）#### MySQL表结构转换为ClickHouse表结构
+#### 2）MySQL表结构转换为ClickHouse表结构
 ``` shell> vim mysql_to_clickhose_schema.py（修改脚本里的配置信息）```
 
 运行
+
 ``` shell> python3 mysql_to_clickhose_schema.py```
 
 原理：连接MySQL获取表结构schema，然后在ClickHouse里执行建表语句。
 
-3）#### binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse
+#### 3）binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse
 ``` shell> vim binlog_parse_clickhouse.py（修改脚本里的配置信息）```
 
 前台运行

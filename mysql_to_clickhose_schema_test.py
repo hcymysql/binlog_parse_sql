@@ -14,7 +14,7 @@ def convert_field_type(field_type):
         return "Int16"
     elif "mediumint" in field_type:
         return "Int32"
-    elif "int" in field_type or "integer" in field_type:
+    elif "int" == field_type:
         return "Int32"
     elif "bigint" in field_type:
         return "Int64"

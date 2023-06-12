@@ -27,6 +27,8 @@ def convert_field_type(field_type):
         return "DateTime"
     elif "char" in field_type or "varchar" in field_type or "text" in field_type or "enum" in field_type or "set" in field_type:
         return "String"
+    elif "bit" in field_type:
+        return "UInt8"
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 

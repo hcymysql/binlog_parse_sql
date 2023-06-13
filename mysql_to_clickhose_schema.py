@@ -4,8 +4,6 @@ import pymysql
 import re
 from clickhouse_driver import Client
 
-# MySQL表结构转换为ClickHouse表结构，该工具仅为单表测试使用。
-
 def convert_field_type(field_type):
     """
     将MySQL字段类型转换为ClickHouse字段类型
@@ -70,7 +68,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
 
     # 执行SQL语句
-    clickhouse_cursor = clickhouse_conn.execute(create_statement)
+    try:
+        clickhouse_cursor = clickhouse_conn.execute(create_statement)
+    except Exception as e:
+        print(f"执行SQL语句失败：{create_statement}")
+        print(f"错误信息：{e}")
 
     # 输出ClickHouse表结构
     print(f"ClickHouse create statement: {create_statement}")

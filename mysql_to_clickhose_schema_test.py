@@ -68,7 +68,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, mysql_table, clickho
     create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
 
     # 执行SQL语句
-    clickhouse_cursor = clickhouse_conn.execute(create_statement)
+    try:
+        clickhouse_cursor = clickhouse_conn.execute(create_statement)
+    except Exception as e:
+        print(f"执行SQL语句失败：{create_statement}")
+        print(f"错误信息：{e}")
 
     # 输出ClickHouse表结构
     print(f"ClickHouse create statement: {create_statement}")

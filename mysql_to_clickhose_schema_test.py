@@ -29,6 +29,14 @@ def convert_field_type(field_type):
         return "String"
     elif "bit" in field_type:
         return "UInt8"
+    elif "time" in field_type:
+        return "FixedString(8)"
+    elif "blob" in field_type:
+        return "String"
+    elif "varbinary" in field_type:
+        return "String"
+    elif field_type.startswith("bit"):
+        return "UInt8"        
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 

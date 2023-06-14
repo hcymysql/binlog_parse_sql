@@ -75,6 +75,7 @@ https://blog.csdn.net/mdh17322249/article/details/123966953
 ``` shell> vim mysql_to_clickhose_schema.py（修改脚本里的配置信息）```
 
 ##### 注：mysql_to_clickhose_schema_test.py（该工具仅为单表测试使用）
+#####     mysql_to_clickhose_schema_all.py（该工具将MySQL实例下的所有库 转换到 ClickHouse实例的相应库下）
 
 运行
 

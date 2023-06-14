@@ -83,7 +83,15 @@ https://blog.csdn.net/mdh17322249/article/details/123966953
 
 原理：连接MySQL获取表结构schema，然后在ClickHouse里执行建表语句。
 
-#### 3）binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse
+#### 3) MySQL全量数据迁移至ClickHouse步骤：
+
+a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p wdhcy159753 -P 3306 --no-schemas -t 12 --csv -v 3 --regex '^hcy.user$' -o ./```
+
+注：需要mydumper 0.12.3-3版本支持导出CSV格式
+
+b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.00000.dat```
+
+#### 4）binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse（增量）
 ``` shell> vim binlog_parse_clickhouse.py（修改脚本里的配置信息）```
 
 前台运行

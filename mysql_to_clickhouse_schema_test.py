@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# MySQL表结构转换为ClickHouse表结构，该工具仅为单表测试使用。
+# 。MySQL表结构转换为ClickHouse表结构，该工具仅为单库单表测试使用
 import pymysql
 import re
 from clickhouse_driver import Client

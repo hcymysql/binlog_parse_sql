@@ -97,6 +97,8 @@ b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.000
 
 ```shell> python3 mysql_to_clickhouse_full_load.py```
 
+会在工具目录下，生成metadata.txt文件（将binlog文件名、位置点和GTID信息保存到metadata.txt文件中）
+
 #### 4）binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse（增量）
 ``` shell> vim binlog_parse_clickhouse.py（修改脚本里的配置信息）```
 

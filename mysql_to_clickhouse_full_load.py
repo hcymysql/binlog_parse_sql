@@ -26,12 +26,11 @@ clickhouse_config = {
     'database': 'hcy'
 }
 
-###############################以下代码不用修改###############################
 mysql_connection = pymysql.connect(**mysql_config, autocommit=False, cursorclass=pymysql.cursors.DictCursor)
 mysql_connection.begin()
 try:
     with mysql_connection.cursor() as cursor:
-        cursor.execute("SET transaction_isolation = 'REPEATABLE-READ'")
+        cursor.execute("SET transaction_isolation = 'REPEATABLE-READ'");
         cursor.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT") # 设置一致性快照
         cursor.execute("SHOW TABLES")
         result = cursor.fetchall()
@@ -50,17 +49,22 @@ try:
         # 将binlog文件名、位置点和GTID信息保存到metadata.txt文件中
         with open('metadata.txt', 'w') as f:
             f.write('{}\n{}\n{}'.format(binlog_file, binlog_position, gtid))
+    #mysql_connection.commit()
+#finally:
 except Exception as e:
-    raise(e)
+    print(e)
+    #mysql_connection.close()
 
 def read_from_mysql(table_name, start_id, end_id):
+    mysql_connection = pymysql.connect(**mysql_config, cursorclass=pymysql.cursors.DictCursor)
     try:
-        query = "SELECT * FROM {} WHERE _rowid >= {} AND _rowid < {}".format(table_name, start_id, end_id)
-        cursor.execute(query)
-        results = cursor.fetchall()
-        return results
-    except Exception as e:
-        raise(e)
+        with mysql_connection.cursor() as cursor:
+            query = "SELECT * FROM {} WHERE _rowid >= {} AND _rowid < {}".format(table_name, start_id, end_id)
+            cursor.execute(query)
+            results = cursor.fetchall()
+            return results
+    finally:
+        mysql_connection.close()
 
 def insert_into_clickhouse(table_name, records):
     clickhouse_client = Client(**clickhouse_config)
@@ -80,7 +84,8 @@ def insert_into_clickhouse(table_name, records):
             values_list.append(f"({','.join(values)})")
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"
         clickhouse_client.execute(query)
-        print(f"执行的SQL是：{query}")
+        ###调试使用
+        #print(f"执行的SQL是：{query}") 
     except Exception as e:
         print('Error inserting records into ClickHouse:', e)
     finally:
@@ -111,10 +116,7 @@ def worker(table_name):
             if len(records) > 0:
                 executor.submit(insert_into_clickhouse, table_name, records)
 
-# 默认并行10张表同时导出数据
+# 并发十张表同时导入数据
 with ThreadPoolExecutor(max_workers=10) as executor:
     for table_name in tables:
         executor.submit(worker, table_name)
-
-mysql_connection.commit()
-mysql_connection.close()

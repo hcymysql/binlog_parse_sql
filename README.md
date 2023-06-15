@@ -72,14 +72,14 @@ https://github.com/julien-duponchelle/python-mysql-replication/issues/386
 https://blog.csdn.net/mdh17322249/article/details/123966953
 
 #### 2）MySQL表结构转换为ClickHouse表结构
-``` shell> vim mysql_to_clickhose_schema.py（修改脚本里的配置信息）```
+``` shell> vim mysql_to_clickhouse_schema.py（修改脚本里的配置信息）```
 
-##### 注：mysql_to_clickhose_schema_test.py（该工具仅为单表测试使用）
-#####     mysql_to_clickhose_schema_all.py（该工具将MySQL实例下的所有库 转换到 ClickHouse实例的相应库下）
+##### 注：mysql_to_clickhouse_schema_test.py（该工具仅为单表测试使用）
+#####     mysql_to_clickhouse_schema_all.py（该工具将MySQL实例下的所有库 转换到 ClickHouse实例的相应库下）
 
 运行
 
-``` shell> python3 mysql_to_clickhose_schema.py```
+``` shell> python3 mysql_to_clickhouse_schema.py```
 
 原理：连接MySQL获取表结构schema，然后在ClickHouse里执行建表语句。
 
@@ -90,6 +90,14 @@ a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p wdhcy159753 -P 3306 
 注：需要mydumper 0.12.3-3版本支持导出CSV格式
 
 b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.00000.dat```
+
+或者使用mysql_to_clickhouse_full_load.py工具
+
+##### MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。
+
+##### 使用条件：表必须有自增主键，测试环境MySQL 8.0
+
+```shell> python3 mysql_to_clickhouse_full_load.py```
 
 #### 4）binlog_parse_clickhouse.py（ETL抽数据工具）将MySQL8.0迁移至ClickHouse（增量）
 ``` shell> vim binlog_parse_clickhouse.py（修改脚本里的配置信息）```

@@ -91,9 +91,7 @@ a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p wdhcy159753 -P 3306 
 
 b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.00000.dat```
 
-或者使用mysql_to_clickhouse_full_load.py工具
-
-##### MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。
+#### 或者使用mysql_to_clickhouse_full_load.py工具（MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。）
 
 ##### 使用条件：表必须有自增主键，测试环境MySQL 8.0
 

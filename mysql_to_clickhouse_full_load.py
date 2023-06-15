@@ -31,6 +31,7 @@ mysql_connection = pymysql.connect(**mysql_config, autocommit=False, cursorclass
 mysql_connection.begin()
 try:
     with mysql_connection.cursor() as cursor:
+        cursor.execute("SET transaction_isolation = 'REPEATABLE-READ'")
         cursor.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT") # 设置一致性快照
         cursor.execute("SHOW TABLES")
         result = cursor.fetchall()

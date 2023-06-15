@@ -85,7 +85,7 @@ https://blog.csdn.net/mdh17322249/article/details/123966953
 
 #### 3) MySQL全量数据迁移至ClickHouse步骤：
 
-a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p wdhcy159753 -P 3306 --no-schemas -t 12 --csv -v 3 --regex '^hcy.user$' -o ./```
+a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p 123456 -P 3306 --no-schemas -t 12 --csv -v 3 --regex '^hcy.user$' -o ./```
 
 注：需要mydumper 0.12.3-3版本支持导出CSV格式
 

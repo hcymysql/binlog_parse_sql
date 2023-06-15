@@ -8,6 +8,25 @@ from queue import Queue
 from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 import datetime
+import logging
+import sys
+
+# 创建日志记录器，将日志写入文件和控制台
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+file_handler = logging.FileHandler('sync.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setLevel(logging.DEBUG)
+stream_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 mysql_config = {
     'host': '192.168.198.239',
@@ -52,7 +71,7 @@ try:
     #mysql_connection.commit()
 #finally:
 except Exception as e:
-    print(e)
+    logger.error(e)
     #mysql_connection.close()
 
 def read_from_mysql(table_name, start_id, end_id):
@@ -85,9 +104,9 @@ def insert_into_clickhouse(table_name, records):
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"
         clickhouse_client.execute(query)
         ###调试使用
-        #print(f"执行的SQL是：{query}") 
+        #logger.debug(f"执行的SQL是：{query}") 
     except Exception as e:
-        print('Error inserting records into ClickHouse:', e)
+        logger.error('Error inserting records into ClickHouse:', e)
     finally:
         clickhouse_client.disconnect()
 
@@ -95,7 +114,7 @@ def worker(table_name):
     min_id, max_id = table_bounds[table_name]
     if min_id == max_id:  # 如果表只有一条记录，则直接处理
         records = read_from_mysql(table_name, min_id, max_id+1)
-        print(f"Retrieved {len(records)} record from MySQL table {table_name} with ID {min_id}")
+        logger.info(f"Retrieved {len(records)} record from MySQL table {table_name} with ID {min_id}")
         if len(records) > 0:
             insert_into_clickhouse(table_name, records)
         return
@@ -112,7 +131,7 @@ def worker(table_name):
             if end_id > max_id:
                 end_id = max_id + 1
             records = read_from_mysql(table_name, start_id, end_id)
-            print(f"Retrieved {len(records)} records from MySQL table {table_name} between ID {start_id} and {end_id}")
+            logger.info(f"Retrieved {len(records)} records from MySQL table {table_name} between ID {start_id} and {end_id}")
             if len(records) > 0:
                 executor.submit(insert_into_clickhouse, table_name, records)
 

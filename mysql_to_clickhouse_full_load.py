@@ -106,7 +106,7 @@ def insert_into_clickhouse(table_name, records):
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"
         clickhouse_client.execute(query)
         ###调试使用
-        #logger.debug(f"执行的SQL是：{query}") 
+        #logger.info(f"执行的SQL是：{query}") 
     except Exception as e:
         logger.error('Error inserting records into ClickHouse:', e)
     finally:

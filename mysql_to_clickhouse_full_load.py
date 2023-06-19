@@ -95,12 +95,14 @@ def insert_into_clickhouse(table_name, records):
             for column_name in column_names:
                 value = record[column_name]
                 if isinstance(value, str) or isinstance(value, datetime.datetime) or isinstance(value, datetime.date):
+                    value = value.replace("'", "\\'")
                     values.append(f"'{value}'")
                 elif value is None:
                     values.append("NULL")    
                 elif isinstance(value, (int, float)):
                     values.append(str(value))
                 else:
+                    value = str(value).replace("'", "\\'")
                     values.append(f"'{str(value)}'")
             values_list.append(f"({','.join(values)})")
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"

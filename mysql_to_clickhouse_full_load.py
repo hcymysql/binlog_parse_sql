@@ -94,8 +94,10 @@ def insert_into_clickhouse(table_name, records):
             values = []
             for column_name in column_names:
                 value = record[column_name]
-                if isinstance(value, str) or isinstance(value, datetime.datetime) or isinstance(value, datetime.date):
+                if isinstance(value, str):
                     value = value.replace("'", "''")
+                    values.append(f"'{value}'")
+                elif isinstance(value, datetime.datetime) or isinstance(value, datetime.date):
                     values.append(f"'{value}'")
                 elif value is None:
                     values.append("NULL")    

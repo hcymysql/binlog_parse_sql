@@ -104,7 +104,6 @@ def insert_into_clickhouse(table_name, records):
                 elif isinstance(value, (int, float)):
                     values.append(str(value))
                 else:
-                    value = str(value).replace("'", "''")
                     values.append(f"'{str(value)}'")
             values_list.append(f"({','.join(values)})")
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"

@@ -91,11 +91,11 @@ a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p 123456 -P 3306 --no-
 
 b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.00000.dat```
 
-#### c) 或者使用mysql_to_clickhouse_full_load.py工具（MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。）
+#### c) 或者使用mysql_to_clickhouse_sync.py工具（MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。）
 
 ##### 使用条件：表必须有自增主键，测试环境MySQL 8.0
 
-```shell> python3 mysql_to_clickhouse_full_load.py```
+```shell> python3 mysql_to_clickhouse_sync.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10```
 
 会在工具目录下，生成metadata.txt文件（将binlog文件名、位置点和GTID信息保存到metadata.txt文件中）
 

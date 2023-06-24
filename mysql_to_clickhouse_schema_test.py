@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 。MySQL表结构转换为ClickHouse表结构，该工具仅为单库单表测试使用
+# MySQL表结构转换为ClickHouse表结构，该工具仅为单库单表测试使用
 import pymysql
 import re
 from clickhouse_driver import Client
@@ -21,8 +21,10 @@ def convert_field_type(field_type):
         return "Int64"
     elif "float" in field_type:
         return "Float32"
-    elif "double" in field_type or "decimal" in field_type or "numeric" in field_type:
+    elif "double" in field_type or "numeric" in field_type:
         return "Float64"
+    elif "decimal" in field_type:
+        return "Decimal128(2)"
     elif "datetime" in field_type or "timestamp" in field_type or "date" in field_type:
         return "DateTime"
     elif "char" in field_type or "varchar" in field_type or "text" in field_type or "enum" in field_type or "set" in field_type:

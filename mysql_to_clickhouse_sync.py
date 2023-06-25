@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。
 # 使用条件：表必须有自增主键，测试环境MySQL 8.0
-# python3 script.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10
+# python3 mysql_to_clickhouse_sync.py  --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10 --exclude_tables "^table1" --include_tables "table2$"
 
 import argparse
 import pymysql.cursors
@@ -12,6 +12,8 @@ import datetime
 import decimal
 import logging
 import sys
+import re
+
 
 # 创建日志记录器，将日志写入文件和控制台
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
 def read_from_mysql(table_name, start_id, end_id, mysql_config):
-    mysql_connection = pymysql.connect(**mysql_config, cursorclass=pymysql.cursors.DictCursor)
+    mysql_connection = pymysql.connect(**mysql_config, autocommit=False, cursorclass=pymysql.cursors.DictCursor)
     try:
         with mysql_connection.cursor() as cursor:
             query = "SELECT * FROM {} WHERE _rowid >= {} AND _rowid < {}".format(table_name, start_id, end_id)
@@ -40,6 +42,7 @@ def read_from_mysql(table_name, start_id, end_id, mysql_config):
             return results
     except Exception as e:
         logger.error(e)
+        return [] 
 
 def insert_into_clickhouse(table_name, records, clickhouse_config):
     clickhouse_client = Client(**clickhouse_config)
@@ -68,7 +71,7 @@ def insert_into_clickhouse(table_name, records, clickhouse_config):
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"
         clickhouse_client.execute(query)
         ###调试使用
-        #logger.info(f"执行的SQL是：{query}")
+        ###logger.info(f"执行的SQL是：{query}")
     except Exception as e:
         logger.error('Error SQL query:', query)  # 记录错误的SQL语句
         logger.error('Error inserting records into ClickHouse:', e)
@@ -112,7 +115,9 @@ def main(args):
         'user': args.mysql_user,
         'password': args.mysql_password,
         'db': args.mysql_db,
-        'charset': 'utf8mb4'
+        'charset': 'utf8mb4',
+        'connect_timeout': 10,
+        'read_timeout': 10
     }
 
     clickhouse_config = {
@@ -122,6 +127,9 @@ def main(args):
         'password': args.clickhouse_password,
         'database': args.clickhouse_database
     }
+
+    exclude_pattern = re.compile(args.exclude_tables) if args.exclude_tables else None
+    include_pattern = re.compile(args.include_tables) if args.include_tables else None
 
     completed_tasks = 0  # 已完成的任务数
 
@@ -133,14 +141,16 @@ def main(args):
             cursor.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT")  # 设置一致性快照
             cursor.execute("SHOW TABLES")
             result = cursor.fetchall()
-            tables = [val for d in result for val in d.values()]
+            #tables = [val for d in result for val in d.values()]
+            tables = [val for d in result for val in d.values() if (not exclude_pattern or not exclude_pattern.search(val))
+                      and (not include_pattern or include_pattern.search(val))]
             table_bounds = {}
             for table_name in tables:
                 cursor.execute("SELECT IFNULL(MIN(_rowid), 0) AS `MIN(id)`, IFNULL(MAX(_rowid), 0) AS `MAX(id)` FROM `{}`".format(table_name))
                 row = cursor.fetchone()
                 min_id, max_id = row['MIN(id)'], row['MAX(id)']
                 table_bounds[table_name] = (min_id, max_id)
-            
+
             cursor.execute("SHOW MASTER STATUS")  # 获取当前的binlog文件名和位置点信息
             binlog_row = cursor.fetchone()
             binlog_file, binlog_position, gtid = binlog_row['File'], binlog_row['Position'], binlog_row['Executed_Gtid_Set']
@@ -148,7 +158,7 @@ def main(args):
             # 将binlog文件名、位置点和GTID信息保存到metadata.txt文件中
             with open('metadata.txt', 'w') as f:
                 f.write('{}\n{}\n{}'.format(binlog_file, binlog_position, gtid))
-            
+
     except Exception as e:
         logger.error(e)
 
@@ -160,11 +170,13 @@ def main(args):
         task_list = []
         for _ in range(len(tables)):
             table_name = next(table_iter)
+            if (exclude_pattern and exclude_pattern.search(table_name)) or (include_pattern and not include_pattern.search(table_name)):
+                continue
             task = executor.submit(worker, table_name, table_bounds, mysql_config, clickhouse_config, args.batch_size, args.max_workers)
             task_list.append(task)
 
         # 循环处理任何一个已完成的任务，并执行后续操作，直到所有任务都完成
-        while completed_tasks < len(tables):  # 直到所有任务都完成
+        while completed_tasks < len(tables): 
             done, _ = concurrent.futures.wait(task_list, return_when=concurrent.futures.FIRST_COMPLETED)
             for future in done:
                 try:
@@ -200,8 +212,12 @@ def parse_args():
     parser.add_argument('--clickhouse_database', type=str, required=True, help='ClickHouse database')
     parser.add_argument('--batch_size', type=int, default=1000, help='Batch size for data import (default: 1000)')
     parser.add_argument('--max_workers', type=int, default=10, help='Maximum number of worker threads (default: 10)')
+    parser.add_argument('--exclude_tables', type=str, default='', help='Tables to exclude (regular expression)')
+    parser.add_argument('--include_tables', type=str, default='', help='Tables to include (regular expression)')
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = parse_args()
     main(args)
+
+

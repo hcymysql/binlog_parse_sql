@@ -74,6 +74,13 @@ def insert_into_clickhouse(table_name, records, clickhouse_config):
                     values.append(f"'{str(value)}'")
             values_list.append(f"({','.join(values)})")
         query = f"INSERT INTO {table_name} ({','.join(column_names)}) VALUES {','.join(values_list)}"
+        """
+        在使用 ClickHouse 数据库的 decimal 类型时，当将值 '4.00' 插入数据库时，会直接截断为 '4'，小数部分 '.00' 被移除。
+        https://github.com/ClickHouse/ClickHouse/issues/51358
+        https://github.com/ClickHouse/ClickHouse/issues/39153
+        """
+        # 解决方案
+        clickhouse_client.execute("set output_format_decimal_trailing_zeros=1")
         clickhouse_client.execute(query)
         ###调试使用
         ###logger.info(f"执行的SQL是：{query}")

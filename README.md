@@ -95,6 +95,11 @@ b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.000
 
 ##### 使用条件：表必须有自增主键，测试环境MySQL 8.0
 
+##### 如果你说服不了开发对每张表增加自增主键ID，那么你要设置参数sql_generate_invisible_primary_key​​​
+##### 开启这个参数，会在建表时，检查表中是否有主键，如果没有主键，则会自动创建。该参数非常实用，减少了DBA对sql语句表结构的审计。
+##### 参考 https://blog.51cto.com/hcymysql/5952924
+
+
 ```shell> python3 mysql_to_clickhouse_sync.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10```
 
 会在工具目录下，生成metadata.txt文件（将binlog文件名、位置点和GTID信息保存到metadata.txt文件中）

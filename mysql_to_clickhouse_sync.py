@@ -149,7 +149,8 @@ def main(args):
     mysql_connection.begin()
     try:
         with mysql_connection.cursor() as cursor:
-            cursor.execute("SET transaction_isolation = 'REPEATABLE-READ'")
+            cursor.execute("FLUSH TABLES WITH READ LOCK")
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             cursor.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT")  # 设置一致性快照
             cursor.execute("SHOW TABLES")
             result = cursor.fetchall()
@@ -178,6 +179,8 @@ def main(args):
             # 将binlog文件名、位置点和GTID信息保存到metadata.txt文件中
             with open('metadata.txt', 'w') as f:
                 f.write('{}\n{}\n{}'.format(binlog_file, binlog_position, gtid))
+
+            cursor.execute("UNLOCK TABLES")
 
     except Exception as e:
         logger.error(e)

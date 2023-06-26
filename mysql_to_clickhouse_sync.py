@@ -158,10 +158,18 @@ def main(args):
                       and (not include_pattern or include_pattern.search(val))]
             table_bounds = {}
             for table_name in tables:
-                cursor.execute("SELECT IFNULL(MIN(_rowid), 0) AS `MIN(id)`, IFNULL(MAX(_rowid), 0) AS `MAX(id)` FROM `{}`".format(table_name))
-                row = cursor.fetchone()
-                min_id, max_id = row['MIN(id)'], row['MAX(id)']
-                table_bounds[table_name] = (min_id, max_id)
+                try:
+                    cursor.execute("SELECT IFNULL(MIN(_rowid), 0) AS `MIN(id)`, IFNULL(MAX(_rowid), 0) AS `MAX(id)` FROM `{}`".format(table_name))
+                    row = cursor.fetchone()
+                    min_id, max_id = row['MIN(id)'], row['MAX(id)']
+                    table_bounds[table_name] = (min_id, max_id)
+                except pymysql.Error as err:
+                    error_message = str(err)
+                    if "_rowid" in error_message or "Unknown column" in error_message:
+                        logger.error("表 {} 缺少主键自增 ID".format(table_name))
+                    else:
+                        # 其他错误处理逻辑
+                        logger.error("执行查询时出现错误: {}".format(error_message))
 
             cursor.execute("SHOW MASTER STATUS")  # 获取当前的binlog文件名和位置点信息
             binlog_row = cursor.fetchone()

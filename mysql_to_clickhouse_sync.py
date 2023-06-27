@@ -41,7 +41,7 @@ def read_from_mysql(table_name, start_id, end_id, mysql_config):
     mysql_connection = pymysql.connect(**mysql_config, autocommit=False, cursorclass=pymysql.cursors.DictCursor)
     try:
         with mysql_connection.cursor() as cursor:
-            query = "SELECT * FROM {} WHERE _rowid >= {} AND _rowid < {}".format(table_name, start_id, end_id)
+            query = "SELECT * FROM {} WHERE _rowid >= {} AND _rowid <= {}".format(table_name, start_id, end_id)
             cursor.execute(query)
             results = cursor.fetchall()
             return results

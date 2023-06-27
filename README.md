@@ -99,6 +99,9 @@ b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.000
 ##### 开启这个参数，会在建表时，检查表中是否有主键，如果没有主键，则会自动创建。该参数非常实用，减少了DBA对sql语句表结构的审计。
 ##### 参考 https://blog.51cto.com/hcymysql/5952924
 
+### d) mysql_to_clickhouse_sync_pagination.py工具（MySQL全量数据导入到ClickHouse里，主键ID可以不自增。）
+
+##### 注：没有自增主键的表，采用LIMIT offset, limit分页方式拉取数据。
 
 ```shell> python3 mysql_to_clickhouse_sync.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10```
 

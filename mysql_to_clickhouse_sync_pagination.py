@@ -215,7 +215,7 @@ def main(args):
                         logger.error("表 {} 缺少主键自增 ID".format(table_name))
                     else:
                         logger.error("执行查询时出现错误: {}".format(error_message))
-            """
+            
             cursor.execute("SHOW MASTER STATUS")  # 获取当前的binlog文件名和位置点信息
             binlog_row = cursor.fetchone()
             binlog_file, binlog_position, gtid = binlog_row['File'], binlog_row['Position'], binlog_row['Executed_Gtid_Set']
@@ -223,7 +223,7 @@ def main(args):
             # 将binlog文件名、位置点和GTID信息保存到metadata.txt文件中
             with open('metadata.txt', 'w') as f:
                 f.write('{}\n{}\n{}'.format(binlog_file, binlog_position, gtid))
-            """
+            
             cursor.execute("UNLOCK TABLES")
             
     except Exception as e:

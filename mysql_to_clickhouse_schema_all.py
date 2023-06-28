@@ -1,8 +1,30 @@
 #!/usr/bin/env python3
-# MySQL表结构转换为ClickHouse表结构，将MySQL实例下的所有库 转换到 ClickHouse实例的相应库下。
+# MySQL表结构转换为ClickHouse表结构，将MySQL实例下的所有库，转换到ClickHouse实例的相应库下。
 import pymysql
 import re
 from clickhouse_driver import Client
+import logging
+
+#################修改以下配置配置信息#################
+# 配置信息
+MYSQL_HOST = "192.168.198.239"
+MYSQL_PORT = 3336
+MYSQL_USER = "admin"
+MYSQL_PASSWORD = "hechunyang"
+MYSQL_DATABASE = "hcy"
+
+CLICKHOUSE_HOST = "192.168.176.204"
+CLICKHOUSE_PORT = 9000
+CLICKHOUSE_USER = "hechunyang"
+CLICKHOUSE_PASSWORD = "123456"
+CLICKHOUSE_DATABASE = "hcy"
+
+LOG_FILE = "convert_error.log"
+
+# 配置日志记录
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+#################以下代码不用修改#################
 
 def convert_field_type(field_type):
     """
@@ -24,7 +46,9 @@ def convert_field_type(field_type):
     elif "double" in field_type or "numeric" in field_type:
         return "Float64"
     elif "decimal" in field_type:
-        return "Decimal128(2)"
+        precision_scale = re.search(r'\((.*?)\)', field_type).group(1)
+        precision, scale = precision_scale.split(',')
+        return f"Decimal({precision}, {scale})"
     elif "datetime" in field_type or "timestamp" in field_type or "date" in field_type:
         return "DateTime"
     elif "char" in field_type or "varchar" in field_type or "text" in field_type or "enum" in field_type or "set" in field_type:
@@ -38,7 +62,7 @@ def convert_field_type(field_type):
     elif "varbinary" in field_type:
         return "String"
     elif field_type.startswith("bit"):
-        return "UInt8"        
+        return "UInt8"
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 
@@ -81,11 +105,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     try:
         clickhouse_cursor = clickhouse_conn.execute(create_statement)
     except Exception as e:
-        print(f"执行SQL语句失败：{create_statement}")
-        print(f"错误信息：{e}")
+        logging.error(f"执行SQL语句失败：{create_statement}")
+        #logging.error(f"错误信息：{e}")
 
     # 输出ClickHouse表结构
-    print(f"ClickHouse create statement: {create_statement}")
+    #print(f"ClickHouse create statement: {create_statement}")
 
 def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_databases=("mysql", "sys","information_schema","performance_schema","test")):
     """
@@ -96,16 +120,16 @@ def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_d
     mysql_cursor.execute("SHOW DATABASES")
     databases = mysql_cursor.fetchall()
 
-    # 遍历所有数据库和其中的表进行转换，排除被排除的数据库
+    # 遍历所有数据库和其中的表进行转换，排除掉被过滤的数据库
     for database in databases:
         database_name = database[0]
         if database_name not in excluded_databases:
-        	# 创建相应的ClickHouse数据库，请确保ClickHouse的账户权限正确
+            # 创建相应的ClickHouse数据库，请确保ClickHouse的账户权限正确
             try:
                 create_database_statement = f"CREATE DATABASE IF NOT EXISTS {database_name}"
                 clickhouse_conn.execute(create_database_statement)
             except Exception as e:
-                print(f"创建ClickHouse数据库{database_name}失败：{e}")
+                logging.error(f"创建ClickHouse数据库{database_name}失败：{e}")
                 raise
             
             # 切换到当前数据库
@@ -123,14 +147,19 @@ def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_d
 if __name__ == "__main__":
     # 连接MySQL数据库
     mysql_conn = pymysql.connect(
-        host="192.168.192.180",
-        port=3306,
-        user="hechunyang",
-        password="123456"
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD
     )
 
     # 连接ClickHouse数据库
-    clickhouse_conn = Client(host='192.168.176.204',port=9000,user='hechunyang',password='123456')
+    clickhouse_conn = Client(
+        host=CLICKHOUSE_HOST,
+        port=CLICKHOUSE_PORT,
+        user=CLICKHOUSE_USER,
+        password=CLICKHOUSE_PASSWORD
+    )
 
     # 转化表结构（将MySQL实例下的所有库 转换到 ClickHouse实例的相应库下）
     convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn)

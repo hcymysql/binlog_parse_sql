@@ -1,9 +1,31 @@
 #!/usr/bin/env python3
 # MySQL表结构转换为ClickHouse表结构，仅为单库。
+
 import pymysql
 import re
 from clickhouse_driver import Client
+import logging
 
+#################修改以下配置配置信息#################
+# 配置信息
+MYSQL_HOST = "192.168.198.239"
+MYSQL_PORT = 3336
+MYSQL_USER = "admin"
+MYSQL_PASSWORD = "hechunyang"
+MYSQL_DATABASE = "hcy"
+
+CLICKHOUSE_HOST = "192.168.176.204"
+CLICKHOUSE_PORT = 9000
+CLICKHOUSE_USER = "hechunyang"
+CLICKHOUSE_PASSWORD = "123456"
+CLICKHOUSE_DATABASE = "hcy"
+
+LOG_FILE = "convert_error.log"
+
+# 配置日志记录
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+#################以下代码不用修改#################
 def convert_field_type(field_type):
     """
     将MySQL字段类型转换为ClickHouse字段类型
@@ -38,7 +60,7 @@ def convert_field_type(field_type):
     elif "varbinary" in field_type:
         return "String"
     elif field_type.startswith("bit"):
-        return "UInt8"        
+        return "UInt8"
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 
@@ -81,11 +103,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     try:
         clickhouse_cursor = clickhouse_conn.execute(create_statement)
     except Exception as e:
-        print(f"执行SQL语句失败：{create_statement}")
-        print(f"错误信息：{e}")
+        logging.error(f"执行SQL语句失败：{create_statement}")
+        #logging.error(f"错误信息：{e}")
 
     # 输出ClickHouse表结构
-    print(f"ClickHouse create statement: {create_statement}")
+    # print(f"ClickHouse create statement: {create_statement}")
 
 def convert_mysql_database_to_clickhouse(mysql_conn, mysql_database, clickhouse_conn, clickhouse_database):
     """
@@ -104,15 +126,15 @@ def convert_mysql_database_to_clickhouse(mysql_conn, mysql_database, clickhouse_
 if __name__ == "__main__":
     # 连接MySQL数据库
     mysql_conn = pymysql.connect(
-        host="192.168.198.239",
-        port=3336,
-        user="admin",
-        password="hechunyang",
-        database="hcy"
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=MYSQL_DATABASE
     )
 
     # 连接ClickHouse数据库
-    clickhouse_conn = Client(host='192.168.176.204',port=9000,user='hechunyang',password='123456',database='hcy')
+    clickhouse_conn = Client(host=CLICKHOUSE_HOST, port=CLICKHOUSE_PORT, user=CLICKHOUSE_USER, password=CLICKHOUSE_PASSWORD, database=CLICKHOUSE_DATABASE)
 
-    # 转化表结构（将MySQL的hcy库下的所有表 转换到 ClickHouse的hcy库下）
-    convert_mysql_database_to_clickhouse(mysql_conn, "hcy", clickhouse_conn, "hcy")
+    # 转化表结构
+    convert_mysql_database_to_clickhouse(mysql_conn, MYSQL_DATABASE, clickhouse_conn, CLICKHOUSE_DATABASE)

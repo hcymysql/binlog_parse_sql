@@ -46,7 +46,9 @@ def convert_field_type(field_type):
     elif "double" in field_type or "numeric" in field_type:
         return "Float64"
     elif "decimal" in field_type:
-        return "Decimal128(2)"
+        precision_scale = re.search(r'\((.*?)\)', field_type).group(1)
+        precision, scale = precision_scale.split(',')
+        return f"Decimal({precision}, {scale})"
     elif "datetime" in field_type or "timestamp" in field_type or "date" in field_type:
         return "DateTime"
     elif "char" in field_type or "varchar" in field_type or "text" in field_type or "enum" in field_type or "set" in field_type:

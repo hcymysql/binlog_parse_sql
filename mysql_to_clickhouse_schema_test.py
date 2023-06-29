@@ -21,10 +21,19 @@ CLICKHOUSE_PASSWORD = "123456"
 CLICKHOUSE_DATABASE = "hcy"
 
 # 要操作的表名
-TABLE_NAME = "hcy"
+TABLE_NAME = "core_service_fee_divide"
+
+# 设置ClickHouse集群的名字，这样方便在所有节点上同时创建表引擎ReplicatedMergeTree
+# 通过select * from system.clusters命令查看集群的名字
+#clickhouse_cluster_name = "perftest_1shards_3replicas"
+
+# 设置表引擎
+TABLE_ENGINE = "MergeTree"
+#TABLE_ENGINE = "ReplicatedMergeTree"
 
 #################以下代码不用修改#################
 def convert_field_type(field_type):
+    print(field_type)
     """
     将MySQL字段类型转换为ClickHouse字段类型
     """
@@ -78,7 +87,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, mysql_table, clickho
 
     # 创建ClickHouse表
     clickhouse_columns = []
-    create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + mysql_table + " ("
+    #create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + mysql_table + " ("
+    if clickhouse_cluster_name:
+        create_statement = f"CREATE TABLE IF NOT EXISTS {clickhouse_database}.{mysql_table} ON CLUSTER {clickhouse_cluster_name} ("
+    else:
+        create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + mysql_table + " ("
     for mysql_column in mysql_columns:
         column_name = mysql_column[0]
         column_type = mysql_column[1]
@@ -97,8 +110,13 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, mysql_table, clickho
     primary_key_str = ",".join(mysql_primary_key)
     create_statement += f"PRIMARY KEY ({primary_key_str})"
 
-    # 设置存储引擎为 MergeTree
-    create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    if TABLE_ENGINE == "MergeTree":
+        # 设置存储引擎为 MergeTree
+        create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    else:
+        # 设置存储引擎为 ReplicatedMergeTree
+        create_statement += f") ENGINE = ReplicatedMergeTree('/clickhouse/tables/{{shard}}/{mysql_table}', '{{replica}}') ORDER BY " + ','.join(mysql_primary_key)
+        # 双括号{{ }}来表示'{shard}'和'{replica}'是作为字符串文本插入的固定值。
 
     # 执行SQL语句
     try:

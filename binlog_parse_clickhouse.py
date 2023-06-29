@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # 从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
+# 支持DDL和DML语句操作
 
 import os
 import pymysql
 import signal
 import atexit
+import re
 import time
 from queue import Queue
 from threading import Thread
@@ -53,6 +55,57 @@ LOG_FILE = "ck_repl_status.log"
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 #################以下代码不用修改#################
+def convert_mysql_to_clickhouse(mysql_sql):
+    # 定义 MySQL 和 ClickHouse 数据类型的映射关系
+    type_mapping = {
+        'bit': 'UInt8',
+        'tinyint': 'Int8',
+        'smallint': 'Int16',
+        'int': 'Int32',
+        'bigint': 'Int64',
+        'float': 'Float32',
+        'double': 'Float64',
+        'decimal': 'Decimal',
+        'char': 'String',
+        'varchar': 'String',
+        'text': 'String',
+        'mediumtext': 'String',
+        'longtext': 'String',
+        'enum': 'String',
+        'set': 'String',
+        'blob': 'String',
+        'varbinary': 'String',
+        'time': 'FixedString(8)',
+        'datetime': 'DateTime',
+        'timestamp': 'DateTime',
+        'date': 'DateTime'
+        # 添加更多的映射关系...
+    }
+
+    # 对于每个映射关系进行替换
+    clickhouse_sql = mysql_sql
+    for mysql_type, clickhouse_type in type_mapping.items():
+        clickhouse_sql = re.sub(r'\b{}\b'.format(mysql_type), clickhouse_type, clickhouse_sql, flags=re.IGNORECASE)
+
+    clickhouse_sql = re.sub(r'\badd\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    clickhouse_sql = re.sub(r'\bdrop\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    clickhouse_sql = re.sub(r'\bmodify\b', 'MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    # 使用正则表达式匹配 CHANGE 语句
+    match = re.search(r'ALTER TABLE\s+(\w+)\s+CHANGE\s+(\w+)\s+(\w+)\s+(\w+)', clickhouse_sql, flags=re.IGNORECASE)
+    if match:
+        table_name = match.group(1)
+        old_column_name = match.group(2)
+        new_column_name = match.group(3)
+        data_type = match.group(4)
+
+        # 判断字段名是否相同
+        if old_column_name == new_column_name:
+            clickhouse_sql = f'ALTER TABLE {table_name} MODIFY COLUMN {old_column_name} {data_type}'
+        else:
+            clickhouse_sql = f'ALTER TABLE {table_name} RENAME COLUMN {old_column_name} TO {new_column_name}; '
+            clickhouse_sql += f'ALTER TABLE {table_name} MODIFY COLUMN {new_column_name} {data_type}'
+    
+    return clickhouse_sql
 
 # 保存 binlog 位置和文件名
 def save_binlog_pos(binlog_file, binlog_pos):
@@ -112,8 +165,11 @@ def sql_worker():
         sql = sql_queue.get()
         try:
             # https://blog.csdn.net/mdh17322249/article/details/123966953
-            target_conn.execute(sql)
-            print(f"success to execute SQL: {sql}")
+            for sql_s in sql.split(';'):
+                single_sql = sql_s.strip()
+                if single_sql:
+                    target_conn.execute(single_sql)
+            print(f"Success to execute SQL: {sql}")
             current_timestamp = int(time.time())
             Seconds_Behind_Master = current_timestamp - event_time
             print(f"入库延迟时间为：{Seconds_Behind_Master} （单位秒）")
@@ -128,12 +184,13 @@ def sql_worker():
 sql_thread = Thread(target=sql_worker, daemon=True)
 sql_thread.start()
 
+# https://python-mysql-replication.readthedocs.io/en/latest/_modules/pymysqlreplication/binlogstream.html#BinLogStreamReader
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
     server_id=source_server_id,  
     blocking=True,
     resume_stream=True,
-    only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
+    only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
 )
@@ -149,9 +206,13 @@ def process_rows_event(binlogevent, stream):
     event_time = binlogevent.timestamp
 
     if isinstance(binlogevent, QueryEvent):
-        sql = binlogevent.query
-        print(sql)
-        sql_queue.put(sql)  # 将 SQL 语句加入队列
+        mysql_sql = binlogevent.query
+        print(mysql_sql)
+
+        clickhouse_sql = convert_mysql_to_clickhouse(mysql_sql)
+        print(clickhouse_sql)
+
+        sql_queue.put(clickhouse_sql) # 将 SQL 语句加入队列
     else:
         for row in binlogevent.rows:
             if isinstance(binlogevent, WriteRowsEvent):

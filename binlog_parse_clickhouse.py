@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-# 从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
-# 支持DDL和DML语句操作
+"""
+- 从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
+- 支持DDL和DML语句操作
+- python3.10编译安装报SSL失败解决方法
+- https://blog.csdn.net/mdh17322249/article/details/123966953
+"""
 
 import os
 import pymysql
@@ -164,7 +168,11 @@ def sql_worker():
     while True:
         sql = sql_queue.get()
         try:
-            # https://blog.csdn.net/mdh17322249/article/details/123966953
+            if sql.strip().upper() == 'BEGIN' or sql.strip().upper() == 'COMMIT':
+                # 跳过事务语句
+                continue
+
+            # 执行其他SQL语句
             for sql_s in sql.split(';'):
                 single_sql = sql_s.strip()
                 if single_sql:

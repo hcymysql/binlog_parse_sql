@@ -21,7 +21,7 @@ CLICKHOUSE_PASSWORD = "123456"
 CLICKHOUSE_DATABASE = "hcy"
 
 # 要操作的表名
-TABLE_NAME = "core_service_fee_divide"
+TABLE_NAME = "user"
 
 # 设置ClickHouse集群的名字，这样方便在所有节点上同时创建表引擎ReplicatedMergeTree
 # 通过select * from system.clusters命令查看集群的名字

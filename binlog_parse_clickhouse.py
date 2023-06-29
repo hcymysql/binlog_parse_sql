@@ -17,6 +17,7 @@ from pymysqlreplication.row_event import (
 from pymysqlreplication.event import QueryEvent
 from pymysqlreplication.event import GtidEvent
 from clickhouse_driver import Client
+import logging
 
 
 #################修改以下配置配置信息#################
@@ -34,8 +35,8 @@ source_mysql_settings = {
 source_server_id = 413336
 
 #设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
-binlog_file = "mysql-bin.000001"
-binlog_pos = 4
+binlog_file = "mysql-bin.000123"
+binlog_pos = 193
 
 # 目标 ClickHouse 数据库设置
 target_clickhouse_settings = {
@@ -45,6 +46,11 @@ target_clickhouse_settings = {
     "password": "123456", # 修改为目标ClickHouse的密码
     "database": "hcy", # 修改为目标ClickHouse的数据库名
 }
+
+LOG_FILE = "ck_repl_status.log"
+
+# 配置日志记录
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 #################以下代码不用修改#################
 
@@ -111,9 +117,10 @@ def sql_worker():
             current_timestamp = int(time.time())
             Seconds_Behind_Master = current_timestamp - event_time
             print(f"入库延迟时间为：{Seconds_Behind_Master} （单位秒）")
+            logging.info(f"入库延迟时间为：{Seconds_Behind_Master} （单位秒）")
         except Exception as e:
-            print(f"Failed to execute SQL: {sql}")
-            print(f"Error message: {e}")
+            logging.error(f"Failed to execute SQL: {sql}")
+            logging.error(f"Error message: {e}")
         finally:
             sql_queue.task_done()
 
@@ -148,11 +155,27 @@ def process_rows_event(binlogevent, stream):
     else:
         for row in binlogevent.rows:
             if isinstance(binlogevent, WriteRowsEvent):
+                values = list(row["values"].values())
+                set_values = []
+                for value in values:
+                    if value is None:
+                        set_values.append('NULL')
+                    elif isinstance(value, str):
+                        set_values.append(f"'{value}'")
+                    else:
+                        set_values.append(str(value))
+                sql = "INSERT INTO {}({}) VALUES ({})".format(
+                    f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
+                    '`' + '`,`'.join(list(row["values"].keys())) + '`',
+                    ','.join(set_values)
+                )
+                """
                 sql = "INSERT INTO {}({}) VALUES ({})".format(
                     f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
                     '`' + '`,`'.join(list(row["values"].keys())) + '`',
                     ','.join(["'%s'" % str(i) for i in list(row["values"].values())])
                 )
+                """
                 print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
     
@@ -172,7 +195,9 @@ def process_rows_event(binlogevent, stream):
                 set_values = []
                 for k, v in row["after_values"].items():
                     if k not in primary_keys:
-                        if isinstance(v, str):
+                        if v is None:
+                            set_values.append(f"`{k}`=NULL")
+                        elif isinstance(v, str):
                             set_values.append(f"`{k}`='{v}'")
                         else:
                             set_values.append(f"`{k}`={v}")

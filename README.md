@@ -63,7 +63,7 @@ https://github.com/julien-duponchelle/python-mysql-replication/issues/386
 #### ClickHouse使用：
 1）安装： 
 
-```shell> pip3 install clickhouse-driver -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
+```shell> pip3 install clickhouse-driver pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```
 
 注：clickhouse_driver库需要调用ssl，由于python3.10之后版本不在支持libressl使用ssl，需要用openssl1.1.1版本或者更高版本
 

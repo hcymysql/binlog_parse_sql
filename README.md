@@ -14,11 +14,13 @@
 
 #### 使用场景：
 
-1）从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB（ETL抽数据工具）
+#### 1）从MySQL8.0实时解析binlog并复制到MariaDB，适用于将MySQL8.0迁移至MariaDB（ETL抽数据工具）
+    binlog_parse_queue.py，支持DDL和DML语句操作
 
 2）数据恢复（研发手抖误删除一张表，通过历史全量恢复+binlog增量恢复）
 
-#### 3）从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）--binlog_parse_clickhouse.py
+#### 3）从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
+    binlog_parse_clickhouse.py，支持DDL和DML语句操作
 
 #### 原理：
 

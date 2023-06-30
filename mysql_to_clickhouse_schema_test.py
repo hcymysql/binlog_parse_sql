@@ -33,7 +33,7 @@ TABLE_ENGINE = "MergeTree"
 
 #################以下代码不用修改#################
 def convert_field_type(field_type):
-    print(field_type)
+    #print(field_type)
     """
     将MySQL字段类型转换为ClickHouse字段类型
     """
@@ -88,7 +88,7 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, mysql_table, clickho
     # 创建ClickHouse表
     clickhouse_columns = []
     #create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + mysql_table + " ("
-    if clickhouse_cluster_name:
+    if 'clickhouse_cluster_name' in globals() and TABLE_ENGINE == 'ReplicatedMergeTree':
         create_statement = f"CREATE TABLE IF NOT EXISTS {clickhouse_database}.{mysql_table} ON CLUSTER {clickhouse_cluster_name} ("
     else:
         create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + mysql_table + " ("

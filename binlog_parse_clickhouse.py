@@ -54,7 +54,6 @@ target_clickhouse_settings = {
 }
 
 LOG_FILE = "ck_repl_status.log"
-
 # 配置日志记录
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -94,6 +93,12 @@ def convert_mysql_to_clickhouse(mysql_sql):
     clickhouse_sql = re.sub(r'\badd\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
     clickhouse_sql = re.sub(r'\bdrop\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
     clickhouse_sql = re.sub(r'\bmodify\b', 'MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+
+    # 当rename table t1 to t2不被转换；当alter table t1 rename cid to cid2才会被转换
+    if re.search(r'(?<!\S)rename(?!\S)', clickhouse_sql, flags=re.IGNORECASE) and not clickhouse_sql.lower().startswith(
+            "rename"):
+        clickhouse_sql = re.sub(r'(?<!\S)rename(?!\S)', 'RENAME COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        
     # 使用正则表达式匹配 CHANGE 语句
     match = re.search(r'ALTER TABLE\s+(\w+)\s+CHANGE\s+(\w+)\s+(\w+)\s+(\w+)', clickhouse_sql, flags=re.IGNORECASE)
     if match:

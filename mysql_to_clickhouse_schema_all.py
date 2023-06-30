@@ -19,8 +19,15 @@ CLICKHOUSE_USER = "hechunyang"
 CLICKHOUSE_PASSWORD = "123456"
 CLICKHOUSE_DATABASE = "hcy"
 
-LOG_FILE = "convert_error.log"
+# 设置ClickHouse集群的名字，这样方便在所有节点上同时创建表引擎ReplicatedMergeTree
+# 通过select * from system.clusters命令查看集群的名字
+#clickhouse_cluster_name = "perftest_1shards_3replicas"
 
+# 设置表引擎
+TABLE_ENGINE = "MergeTree"
+#TABLE_ENGINE = "ReplicatedMergeTree"
+
+LOG_FILE = "convert_error.log"
 # 配置日志记录
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -66,6 +73,7 @@ def convert_field_type(field_type):
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 
+
 def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhouse_conn, clickhouse_database):
     """
     将MySQL表结构转换为ClickHouse
@@ -80,7 +88,11 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
 
     # 创建ClickHouse表
     clickhouse_columns = []
-    create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + table_name + " ("
+    if 'clickhouse_cluster_name' in globals() and TABLE_ENGINE == 'ReplicatedMergeTree':
+        create_statement = f"CREATE TABLE IF NOT EXISTS {clickhouse_database}.{table_name} ON CLUSTER {clickhouse_cluster_name} ("
+    else:
+        create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + table_name + " ("
+
     for mysql_column in mysql_columns:
         column_name = mysql_column[0]
         column_type = mysql_column[1]
@@ -98,20 +110,27 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     primary_key_str = ",".join(mysql_primary_key)
     create_statement += f"PRIMARY KEY ({primary_key_str})"
 
-    # 设置存储引擎为 MergeTree
-    create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    if TABLE_ENGINE == "MergeTree":
+        # 设置存储引擎为 MergeTree
+        create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    else:
+        # 设置存储引擎为 ReplicatedMergeTree
+        create_statement += f") ENGINE = ReplicatedMergeTree('/clickhouse/tables/{{shard}}/{table_name}', '{{replica}}') ORDER BY " + ','.join(mysql_primary_key)
+        # 双括号{{ }}来表示'{shard}'和'{replica}'是作为字符串文本插入的固定值。
 
     # 执行SQL语句
     try:
         clickhouse_cursor = clickhouse_conn.execute(create_statement)
     except Exception as e:
         logging.error(f"执行SQL语句失败：{create_statement}")
-        #logging.error(f"错误信息：{e}")
+        # logging.error(f"错误信息：{e}")
 
     # 输出ClickHouse表结构
-    #print(f"ClickHouse create statement: {create_statement}")
+    # print(f"ClickHouse create statement: {create_statement}")
 
-def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_databases=("mysql", "sys","information_schema","performance_schema","test")):
+
+def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_databases=(
+"mysql", "sys", "information_schema", "performance_schema", "test")):
     """
     将MySQL实例下的所有数据库表结构转换为ClickHouse
     """
@@ -126,12 +145,15 @@ def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_d
         if database_name not in excluded_databases:
             # 创建相应的ClickHouse数据库，请确保ClickHouse的账户权限正确
             try:
-                create_database_statement = f"CREATE DATABASE IF NOT EXISTS {database_name}"
+                if 'clickhouse_cluster_name' in globals() and TABLE_ENGINE == 'ReplicatedMergeTree':
+                    create_database_statement = f"CREATE DATABASE IF NOT EXISTS {database_name} ON CLUSTER {clickhouse_cluster_name}"
+                else:
+                    create_database_statement = f"CREATE DATABASE IF NOT EXISTS {database_name}"
                 clickhouse_conn.execute(create_database_statement)
             except Exception as e:
                 logging.error(f"创建ClickHouse数据库{database_name}失败：{e}")
                 raise
-            
+
             # 切换到当前数据库
             mysql_cursor.execute(f"USE {database_name}")
 
@@ -143,6 +165,7 @@ def convert_mysql_database_to_clickhouse(mysql_conn, clickhouse_conn, excluded_d
             for table in tables:
                 table_name = table[0]
                 convert_mysql_to_clickhouse(mysql_conn, database_name, table_name, clickhouse_conn, database_name)
+
 
 if __name__ == "__main__":
     # 连接MySQL数据库

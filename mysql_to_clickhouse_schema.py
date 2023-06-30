@@ -20,8 +20,15 @@ CLICKHOUSE_USER = "hechunyang"
 CLICKHOUSE_PASSWORD = "123456"
 CLICKHOUSE_DATABASE = "hcy"
 
-LOG_FILE = "convert_error.log"
+# 设置ClickHouse集群的名字，这样方便在所有节点上同时创建表引擎ReplicatedMergeTree
+# 通过select * from system.clusters命令查看集群的名字
+#clickhouse_cluster_name = "perftest_1shards_3replicas"
 
+# 设置表引擎
+TABLE_ENGINE = "MergeTree"
+#TABLE_ENGINE = "ReplicatedMergeTree"
+
+LOG_FILE = "convert_error.log"
 # 配置日志记录
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -80,11 +87,14 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
 
     # 创建ClickHouse表
     clickhouse_columns = []
-    create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + table_name + " ("
+    if 'clickhouse_cluster_name' in globals() and TABLE_ENGINE == 'ReplicatedMergeTree':
+        create_statement = f"CREATE TABLE IF NOT EXISTS {clickhouse_database}.{table_name} ON CLUSTER {clickhouse_cluster_name} ("
+    else:
+        create_statement = "CREATE TABLE IF NOT EXISTS " + clickhouse_database + "." + table_name + " ("
     for mysql_column in mysql_columns:
         column_name = mysql_column[0]
         column_type = mysql_column[1]
-
+        
         # 转换字段类型
         clickhouse_type = convert_field_type(column_type)
 
@@ -98,8 +108,13 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     primary_key_str = ",".join(mysql_primary_key)
     create_statement += f"PRIMARY KEY ({primary_key_str})"
 
-    # 设置存储引擎为 MergeTree
-    create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    if TABLE_ENGINE == "MergeTree":
+        # 设置存储引擎为 MergeTree
+        create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
+    else:
+        # 设置存储引擎为 ReplicatedMergeTree
+        create_statement += f") ENGINE = ReplicatedMergeTree('/clickhouse/tables/{{shard}}/{table_name}', '{{replica}}') ORDER BY " + ','.join(mysql_primary_key)
+        # 双括号{{ }}来表示'{shard}'和'{replica}'是作为字符串文本插入的固定值。
 
     # 执行SQL语句
     try:

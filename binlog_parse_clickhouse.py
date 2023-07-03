@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 - 从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
-- 支持DDL和DML语句操作
+- 支持DDL和DML语句操作（注：解析binlog转换（ClickHouse）CREATE TABLE语法较复杂，暂不支持）
 - python3.10编译安装报SSL失败解决方法
 - https://blog.csdn.net/mdh17322249/article/details/123966953
 """
@@ -25,7 +25,6 @@ from pymysqlreplication.event import GtidEvent
 from clickhouse_driver import Client
 import logging
 
-
 #################修改以下配置配置信息#################
 # 源 MySQL 8.0 数据库设置
 source_mysql_settings = {
@@ -37,21 +36,25 @@ source_mysql_settings = {
     "charset": "utf8mb4",
 }
 
-#设置源MySQL Server-Id
+# 设置源MySQL Server-Id
 source_server_id = 413336
 
-#设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
+# 设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
 binlog_file = "mysql-bin.000123"
 binlog_pos = 193
 
 # 目标 ClickHouse 数据库设置
 target_clickhouse_settings = {
-    "host": "192.168.176.204", # 修改为目标ClickHouse的IP地址或域名
-    "port": 9000, # 修改为目标ClickHouse的端口号
-    "user": "hechunyang", # 修改为目标ClickHouse的用户名
-    "password": "123456", # 修改为目标ClickHouse的密码
-    "database": "hcy", # 修改为目标ClickHouse的数据库名
+    "host": "192.168.176.204",  # 修改为目标ClickHouse的IP地址或域名
+    "port": 9000,  # 修改为目标ClickHouse的端口号
+    "user": "hechunyang",  # 修改为目标ClickHouse的用户名
+    "password": "123456",  # 修改为目标ClickHouse的密码
+    "database": "hcy",  # 修改为目标ClickHouse的数据库名
 }
+
+# 设置ClickHouse集群的名字，这样方便在所有节点上同时执行DDL操作
+# 通过select * from system.clusters命令查看集群的名字
+#clickhouse_cluster_name = "perftest_1shards_3replicas"
 
 LOG_FILE = "ck_repl_status.log"
 # 配置日志记录
@@ -90,14 +93,30 @@ def convert_mysql_to_clickhouse(mysql_sql):
     for mysql_type, clickhouse_type in type_mapping.items():
         clickhouse_sql = re.sub(r'\b{}\b'.format(mysql_type), clickhouse_type, clickhouse_sql, flags=re.IGNORECASE)
 
-    clickhouse_sql = re.sub(r'\badd\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
-    clickhouse_sql = re.sub(r'\bdrop\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
-    clickhouse_sql = re.sub(r'\bmodify\b', 'MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    """
+    解析binlog转换（ClickHouse）CREATE TABLE语法较复杂，想办法解决。
+    <code>代码块……</code>
+    """
+
+    if 'clickhouse_cluster_name' in globals():
+        clickhouse_sql = re.sub(r'\badd\b', f' ON CLUSTER {clickhouse_cluster_name} ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bdrop\b', f' ON CLUSTER {clickhouse_cluster_name} DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bmodify\b', f' ON CLUSTER {clickhouse_cluster_name} MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    else:
+        clickhouse_sql = re.sub(r'\badd\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bdrop\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bmodify\b', 'MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
 
     # 当rename table t1 to t2不被转换；当alter table t1 rename cid to cid2才会被转换
-    if re.search(r'(?<!\S)rename(?!\S)', clickhouse_sql, flags=re.IGNORECASE) and not clickhouse_sql.strip().lower().startswith("rename"):
-        clickhouse_sql = re.sub(r'(?<!\S)rename(?!\S)', 'RENAME COLUMN', clickhouse_sql, flags=re.IGNORECASE)
-        
+    if re.search(r'(?<!\S)rename(?!\S)', clickhouse_sql,flags=re.IGNORECASE) and not clickhouse_sql.strip().lower().startswith("rename"):
+        if 'clickhouse_cluster_name' in globals():
+            clickhouse_sql = re.sub(r'(?<!\S)rename(?!\S)column', f' ON CLUSTER {clickhouse_cluster_name} RENAME COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        else:
+            clickhouse_sql = re.sub(r'(?<!\S)rename(?!\S)column', 'RENAME COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+    elif clickhouse_sql.strip().lower().startswith("rename"):
+        if 'clickhouse_cluster_name' in globals():
+            clickhouse_sql += f' ON CLUSTER {clickhouse_cluster_name}'
+
     # 使用正则表达式匹配 CHANGE 语句
     match = re.search(r'ALTER TABLE\s+(\w+)\s+CHANGE\s+(\w+)\s+(\w+)\s+(\w+)', clickhouse_sql, flags=re.IGNORECASE)
     if match:
@@ -108,12 +127,19 @@ def convert_mysql_to_clickhouse(mysql_sql):
 
         # 判断字段名是否相同
         if old_column_name == new_column_name:
-            clickhouse_sql = f'ALTER TABLE {table_name} MODIFY COLUMN {old_column_name} {data_type}'
+            if 'clickhouse_cluster_name' in globals():
+                clickhouse_sql = f'ALTER TABLE {table_name} ON CLUSTER {clickhouse_cluster_name} MODIFY COLUMN {old_column_name} {data_type}'
+            else:
+                clickhouse_sql = f'ALTER TABLE {table_name} MODIFY COLUMN {old_column_name} {data_type}'
         else:
-            clickhouse_sql = f'ALTER TABLE {table_name} RENAME COLUMN {old_column_name} TO {new_column_name}; '
-            clickhouse_sql += f'ALTER TABLE {table_name} MODIFY COLUMN {new_column_name} {data_type}'
-    
+            if 'clickhouse_cluster_name' in globals():
+                clickhouse_sql = f'ALTER TABLE {table_name} ON CLUSTER {clickhouse_cluster_name} RENAME COLUMN {old_column_name} TO {new_column_name}; '
+                clickhouse_sql += f'ALTER TABLE {table_name} ON CLUSTER {clickhouse_cluster_name} MODIFY COLUMN {new_column_name} {data_type}'
+            else:
+                clickhouse_sql = f'ALTER TABLE {table_name} RENAME COLUMN {old_column_name} TO {new_column_name}; '
+                clickhouse_sql += f'ALTER TABLE {table_name} MODIFY COLUMN {new_column_name} {data_type}'
     return clickhouse_sql
+
 
 # 保存 binlog 位置和文件名
 def save_binlog_pos(binlog_file, binlog_pos):
@@ -126,6 +152,7 @@ def save_binlog_pos(binlog_file, binlog_pos):
         with open('binlog_info.txt', 'w') as f:
             f.write('{}\n{}'.format(current_binlog_file, binlog_pos))
         print('Binlog position ({}, {}) updated.'.format(current_binlog_file, binlog_pos))
+
 
 # 读取上次保存的 binlog 位置和文件名
 def load_binlog_pos():
@@ -145,19 +172,22 @@ def load_binlog_pos():
 # 退出程序时保存当前的 binlog 文件名和位置点
 def exit_handler(stream, current_binlog_file, binlog_pos):
     stream.close()
-    #save_binlog_pos(current_binlog_file, binlog_pos)
+    # save_binlog_pos(current_binlog_file, binlog_pos)
     save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
+
 
 # 在程序被终止时保存当前的 binlog 文件名和位置点
 def save_binlog_pos_on_termination(signum, frame):
     save_binlog_pos(current_binlog_file, binlog_pos or stream.log_pos)
     quit_program()
 
+
 # 退出程序时保存当前的 binlog 文件名和位置点
 def quit_program():
     stream.close()
     target_conn.close()
     exit(0)
+
 
 # 建立连接
 target_conn = Client(**target_clickhouse_settings)
@@ -166,6 +196,7 @@ saved_pos = load_binlog_pos()
 
 # 定义队列用于存放 SQL 语句并作为解析 binlog 和执行 SQL 语句的中间件
 sql_queue = Queue()
+
 
 # 定义 SQL 执行函数，从队列中取出 SQL 语句并依次执行
 def sql_worker():
@@ -192,6 +223,7 @@ def sql_worker():
         finally:
             sql_queue.task_done()
 
+
 # 启动 SQL 执行线程
 sql_thread = Thread(target=sql_worker, daemon=True)
 sql_thread.start()
@@ -199,13 +231,14 @@ sql_thread.start()
 # https://python-mysql-replication.readthedocs.io/en/latest/_modules/pymysqlreplication/binlogstream.html#BinLogStreamReader
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
-    server_id=source_server_id,  
+    server_id=source_server_id,
     blocking=True,
     resume_stream=True,
     only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
     log_pos=saved_pos[1]
 )
+
 
 # 循环遍历解析出来的行事件并存入SQL语句中
 def process_rows_event(binlogevent, stream):
@@ -224,7 +257,7 @@ def process_rows_event(binlogevent, stream):
         clickhouse_sql = convert_mysql_to_clickhouse(mysql_sql)
         print(clickhouse_sql)
 
-        sql_queue.put(clickhouse_sql) # 将 SQL 语句加入队列
+        sql_queue.put(clickhouse_sql)  # 将 SQL 语句加入队列
     else:
         for row in binlogevent.rows:
             if isinstance(binlogevent, WriteRowsEvent):
@@ -251,7 +284,7 @@ def process_rows_event(binlogevent, stream):
                 """
                 print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
-    
+
             elif isinstance(binlogevent, UpdateRowsEvent):
                 db = pymysql.connect(**source_mysql_settings)
                 cursor = db.cursor()
@@ -288,7 +321,7 @@ def process_rows_event(binlogevent, stream):
                 sql = f"ALTER TABLE `{binlogevent.table}` UPDATE {set_clause} WHERE {where_clause}"
                 print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
-    
+
             elif isinstance(binlogevent, DeleteRowsEvent):
                 sql = "ALTER TABLE `{}` DELETE WHERE {}".format(
                     f"{binlogevent.table}" if database_name else binlogevent.table,
@@ -296,7 +329,7 @@ def process_rows_event(binlogevent, stream):
                 )
                 print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
-                    
+
     return binlogevent.packet.log_pos
 
 
@@ -304,11 +337,11 @@ def process_rows_event(binlogevent, stream):
 while True:
     try:
         for binlogevent in stream:
-            #print(f'binlog: {stream.log_file}, positon: {stream.log_pos}')
+            # print(f'binlog: {stream.log_file}, positon: {stream.log_pos}')
             current_binlog_file = stream.log_file
             try:
                 binlog_pos = process_rows_event(binlogevent, stream)
-                #print(f'binlog_pos :=====> {binlog_pos}')
+                # print(f'binlog_pos :=====> {binlog_pos}')
             except AttributeError as e:
                 save_binlog_pos(current_binlog_file, binlog_pos)
             else:

@@ -2,6 +2,7 @@
 """
 - 从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
 - 支持DDL和DML语句操作（注：解析binlog转换（ClickHouse）CREATE TABLE语法较复杂，暂不支持）
+- 支持只同步某几张表或忽略同步某几张表
 - python3.10编译安装报SSL失败解决方法
 - https://blog.csdn.net/mdh17322249/article/details/123966953
 """
@@ -42,6 +43,14 @@ source_server_id = 413336
 # 设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
 binlog_file = "mysql-bin.000123"
 binlog_pos = 193
+
+# 设置同步忽略的表（支持正则表达式）
+#ignore_tables = ['t1', 'yy'] #表示忽略同步t1和yy两张表
+#ignore_prefixes = ['^user_.*$', '^opt_.*$'] #表示忽略user_和opt_前缀的所有表
+
+# 设置只同步的表（支持正则表达式）
+#repl_tables = ['nba'] #表示只同步nba这一张表
+#repl_prefixes = ['^rsz_.*$'] #表示只同步rsz_前缀的所有表
 
 # 目标 ClickHouse 数据库设置
 target_clickhouse_settings = {
@@ -228,6 +237,69 @@ def sql_worker():
 sql_thread = Thread(target=sql_worker, daemon=True)
 sql_thread.start()
 
+####################################################################################################################
+def ignore_table_filter(table_name):
+    global ignore_tables, ignore_prefixes
+
+    if 'ignore_tables' in globals() and ignore_tables is not None and table_name in ignore_tables:
+        return True
+
+    if 'ignore_prefixes' in globals() and ignore_prefixes is not None:
+        for prefix in ignore_prefixes:
+            if re.match(prefix, table_name):
+                return True
+
+    return False
+
+def repl_table_filter(table_name):
+    global repl_tables, repl_prefixes
+
+    if 'repl_tables' in globals() and repl_tables is not None and table_name in repl_tables:
+        return True
+
+    if 'repl_prefixes' in globals() and repl_prefixes is not None:
+        for prefix in repl_prefixes:
+            if re.match(prefix, table_name):
+                return True
+
+    return False
+
+# 要排除的数据库列表
+excluded_databases = ['mysql', 'sys', 'information_schema', 'performance_schema', 'test']
+
+if 'repl_tables' in globals() and repl_tables is not None:
+    all_tables = repl_tables
+elif 'ignore_tables' in globals() and ignore_tables is not None:
+    all_tables = ignore_tables
+else:
+    all_tables = []
+
+# 如果设置了 ignore_prefixes 或 repl_prefixes，则获取所有表信息
+if ('ignore_prefixes' in globals() and ignore_prefixes is not None) or ('repl_prefixes' in globals() and repl_prefixes is not None):
+    # 连接MySQL数据库
+    connection = pymysql.connect(**source_mysql_settings)
+    cursor = connection.cursor()
+
+    # 获取所有数据库名
+    cursor.execute("SHOW DATABASES")
+    databases = cursor.fetchall()
+    database_names = [database[0] for database in databases]
+
+    # 过滤要排除的数据库
+    filtered_database_names = [database for database in database_names if database not in excluded_databases]
+
+    # 获取每个数据库的所有表名
+    for database_name in filtered_database_names:
+        cursor.execute(f"USE `{database_name}`")
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
+        table_names = [table[0] for table in tables]
+        all_tables.extend(table_names)
+
+    # 关闭数据库连接
+    cursor.close()
+    connection.close()
+    
 # https://python-mysql-replication.readthedocs.io/en/latest/_modules/pymysqlreplication/binlogstream.html#BinLogStreamReader
 stream = BinLogStreamReader(
     connection_settings=source_mysql_settings,
@@ -236,9 +308,12 @@ stream = BinLogStreamReader(
     resume_stream=True,
     only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent],
     log_file=saved_pos[0],
-    log_pos=saved_pos[1]
+    log_pos=saved_pos[1],
+    only_tables = [table_name for table_name in all_tables if repl_table_filter(table_name)] \
+        if ('repl_tables' in globals() and repl_tables is not None) or ('repl_prefixes' in globals() and repl_prefixes is not None) else None,
+    ignored_tables = [table_name for table_name in all_tables if ignore_table_filter(table_name)] \
+        if ('ignore_tables' in globals() and ignore_tables is not None) or ('ignore_prefixes' in globals() and ignore_prefixes is not None) else None
 )
-
 
 # 循环遍历解析出来的行事件并存入SQL语句中
 def process_rows_event(binlogevent, stream):

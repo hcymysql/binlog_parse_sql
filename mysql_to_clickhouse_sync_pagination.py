@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。
-# 使用条件：表必须有自增主键，测试环境MySQL 8.0
+# 使用条件：表可以没有自增主键，测试环境MySQL 8.0
 """
 shell> python3 mysql_to_clickhouse_sync.py  --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin 
 --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 

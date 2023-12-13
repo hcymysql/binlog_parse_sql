@@ -31,6 +31,7 @@ SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样�
 
 -----------------------------------
 #### MariaDB使用：
+# 视频演示：https://www.bilibili.com/video/BV1eb4y157Bk/
 1）安装： 
 
 ```shell> pip3 install pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```

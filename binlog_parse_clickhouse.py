@@ -109,11 +109,15 @@ def convert_mysql_to_clickhouse(mysql_sql):
 
     if 'clickhouse_cluster_name' in globals():
         clickhouse_sql = re.sub(r'\badd\b', f' ON CLUSTER {clickhouse_cluster_name} ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\badd\s+column\b', f' ON CLUSTER {clickhouse_cluster_name} ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
         clickhouse_sql = re.sub(r'\bdrop\b', f' ON CLUSTER {clickhouse_cluster_name} DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bdrop\s+column\b', f' ON CLUSTER {clickhouse_cluster_name} DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
         clickhouse_sql = re.sub(r'\bmodify\b', f' ON CLUSTER {clickhouse_cluster_name} MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
     else:
         clickhouse_sql = re.sub(r'\badd\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\badd\s+column\b', 'ADD COLUMN', clickhouse_sql, flags=re.IGNORECASE)
         clickhouse_sql = re.sub(r'\bdrop\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
+        clickhouse_sql = re.sub(r'\bdrop\s+column\b', 'DROP COLUMN', clickhouse_sql, flags=re.IGNORECASE)
         clickhouse_sql = re.sub(r'\bmodify\b', 'MODIFY COLUMN', clickhouse_sql, flags=re.IGNORECASE)
 
     # 当rename table t1 to t2不被转换；当alter table t1 rename cid to cid2才会被转换

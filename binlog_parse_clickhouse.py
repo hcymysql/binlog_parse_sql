@@ -233,6 +233,7 @@ def sql_worker():
         except Exception as e:
             logging.error(f"Failed to execute SQL: {sql}")
             logging.error(f"Error message: {e}")
+            os.kill(os.getpid(), signal.SIGTERM) 
         finally:
             sql_queue.task_done()
 

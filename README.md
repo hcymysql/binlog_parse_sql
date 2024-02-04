@@ -1,6 +1,5 @@
 #### 使用场景：
 #### 1）从MySQL8.0实时解析binlog并复制到ClickHouse，适用于将MySQL8.0迁移至ClickHouse（ETL抽数据工具）
-    binlog_parse_clickhouse.py，支持DDL和DML语句操作
 
 #### 原理：
 
@@ -10,8 +9,8 @@
 SQL 执行线程从队列中取出 SQL 语句并按顺序依次执行，这样就保证了 SQL 语句的串行执行。
 
 -----------------------------------
-##############################################################################################
 #### ClickHouse使用：
+
 1）安装： 
 
 ```shell> pip3 install clickhouse-driver pymysql mysql-replication -i "http://mirrors.aliyun.com/pypi/simple" --trusted-host "mirrors.aliyun.com"```

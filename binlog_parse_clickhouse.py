@@ -7,12 +7,13 @@
 - https://blog.csdn.net/mdh17322249/article/details/123966953
 """
 
-import os
+import os,sys
 import pymysql
 import signal
 import atexit
 import re
-import time
+import time,datetime
+import json
 from queue import Queue
 from threading import Thread
 from pymysqlreplication import BinLogStreamReader
@@ -30,19 +31,19 @@ import logging
 # 源 MySQL 8.0 数据库设置
 source_mysql_settings = {
     "host": "192.168.198.239",
-    "port": 3336,
+    "port": 6666,
     "user": "admin",
-    "passwd": "hechunyang",
-    "database": "hcy",
+    "passwd": "123456",
+    "database": "test",
     "charset": "utf8mb4",
 }
 
 # 设置源MySQL Server-Id
-source_server_id = 413336
+source_server_id = 66661
 
 # 设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
-binlog_file = "mysql-bin.000123"
-binlog_pos = 193
+binlog_file = "mysql-bin.000001"
+binlog_pos = 4
 
 # 设置同步忽略的表（支持正则表达式）
 #ignore_tables = ['t1', 'yy'] #表示忽略同步t1和yy两张表
@@ -56,9 +57,9 @@ binlog_pos = 193
 target_clickhouse_settings = {
     "host": "192.168.176.204",  # 修改为目标ClickHouse的IP地址或域名
     "port": 9000,  # 修改为目标ClickHouse的端口号
-    "user": "hechunyang",  # 修改为目标ClickHouse的用户名
+    "user": "admin",  # 修改为目标ClickHouse的用户名
     "password": "123456",  # 修改为目标ClickHouse的密码
-    "database": "hcy",  # 修改为目标ClickHouse的数据库名
+    "database": "cktest",  # 修改为目标ClickHouse的数据库名
 }
 
 # 设置ClickHouse集群的名字，这样方便在所有节点上同时执行DDL操作
@@ -233,13 +234,14 @@ def sql_worker():
         except Exception as e:
             logging.error(f"Failed to execute SQL: {sql}")
             logging.error(f"Error message: {e}")
-            os.kill(os.getpid(), signal.SIGTERM) 
+            os.kill(os.getpid(), signal.SIGTERM)
         finally:
             sql_queue.task_done()
 
 
 # 启动 SQL 执行线程
 sql_thread = Thread(target=sql_worker, daemon=True)
+#sql_thread = Thread(target=sql_worker)
 sql_thread.start()
 
 ####################################################################################################################
@@ -322,6 +324,17 @@ stream = BinLogStreamReader(
 
 # 循环遍历解析出来的行事件并存入SQL语句中
 def process_rows_event(binlogevent, stream):
+
+    def convert_bytes_to_str(data):
+        if isinstance(data, dict):
+            return {convert_bytes_to_str(key): convert_bytes_to_str(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [convert_bytes_to_str(item) for item in data]
+        elif isinstance(data, bytes):
+            return data.decode('utf-8')
+        else:
+            return data
+
     if hasattr(binlogevent, "schema"):
         database_name = binlogevent.schema  # 获取数据库名
     else:
@@ -346,23 +359,23 @@ def process_rows_event(binlogevent, stream):
                 for value in values:
                     if value is None:
                         set_values.append('NULL')
+                    elif isinstance(value, (str, datetime.datetime, datetime.date)):
+                        set_values.append(f"'{value}'")
                     elif isinstance(value, str):
                         set_values.append(f"'{value}'")
+                    elif isinstance(value, dict):
+                        v = json.dumps(convert_bytes_to_str(value))
+                        set_values.append(f"'{v}'")
                     else:
                         set_values.append(str(value))
+                        
                 sql = "INSERT INTO {}({}) VALUES ({})".format(
-                    f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
+                    f"`{database_name}`.`{binlogevent.table}`" if database_name else binlogevent.table,
                     '`' + '`,`'.join(list(row["values"].keys())) + '`',
                     ','.join(set_values)
                 )
-                """
-                sql = "INSERT INTO {}({}) VALUES ({})".format(
-                    f"{database_name}.{binlogevent.table}" if database_name else binlogevent.table,
-                    '`' + '`,`'.join(list(row["values"].keys())) + '`',
-                    ','.join(["'%s'" % str(i) for i in list(row["values"].values())])
-                )
-                """
-                print(sql)
+
+                #print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
 
             elif isinstance(binlogevent, UpdateRowsEvent):
@@ -383,7 +396,10 @@ def process_rows_event(binlogevent, stream):
                     if k not in primary_keys:
                         if v is None:
                             set_values.append(f"`{k}`=NULL")
-                        elif isinstance(v, str):
+                        elif isinstance(v, (str, datetime.datetime, datetime.date)):
+                            set_values.append(f"`{k}`='{v}'")
+                        elif isinstance(v, dict):
+                            v=json.dumps(convert_bytes_to_str(v))
                             set_values.append(f"`{k}`='{v}'")
                         else:
                             set_values.append(f"`{k}`={v}")
@@ -391,7 +407,10 @@ def process_rows_event(binlogevent, stream):
 
                 where_values = []
                 for k, v in row["before_values"].items():
-                    if isinstance(v, str):
+                    if isinstance(v, (str, datetime.datetime, datetime.date)):
+                        where_values.append(f"`{k}`='{v}'")
+                    elif isinstance(v, dict):
+                        v=json.dumps(convert_bytes_to_str(v))
                         where_values.append(f"`{k}`='{v}'")
                     else:
                         where_values.append(f"`{k}`={v}")
@@ -399,15 +418,21 @@ def process_rows_event(binlogevent, stream):
 
                 # https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse
                 sql = f"ALTER TABLE `{binlogevent.table}` UPDATE {set_clause} WHERE {where_clause}"
-                print(sql)
+                #print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
 
             elif isinstance(binlogevent, DeleteRowsEvent):
-                sql = "ALTER TABLE `{}` DELETE WHERE {}".format(
-                    f"{binlogevent.table}" if database_name else binlogevent.table,
-                    ' AND '.join(["`{}`='{}'".format(k, v) for k, v in row["values"].items()])
+                sql = "ALTER TABLE {} DELETE WHERE {};".format(
+                    "`{}`.`{}`".format(database_name, binlogevent.table) if database_name else "`{}`".format(
+                        binlogevent.table),
+                    ' AND '.join(["`{}`={}".format(k,"'{}'".format(v) if isinstance(v, (
+                    str, datetime.datetime, datetime.date))
+                    else 'NULL' if v is None
+                    else "'{}'".format(json.dumps(convert_bytes_to_str(v))) if isinstance(v, (
+                    dict)) else str(v))
+                    for k, v in row["values"].items()])
                 )
-                print(sql)
+                #print(sql)
                 sql_queue.put(sql)  # 将 SQL 语句加入队列
 
     return binlogevent.packet.log_pos
@@ -446,3 +471,4 @@ signal.signal(signal.SIGINT, save_binlog_pos_on_termination)
 
 # 关闭连接
 atexit.register(target_conn.close)
+

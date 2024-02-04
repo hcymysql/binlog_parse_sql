@@ -62,11 +62,11 @@ b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.000
 
 前台运行
 
-```shell> python3 binlog_parse_clickhouse.py```
+```shell> python3 binlog_parse_clickhouse.py -f config.yaml```
 
 后台运行
 
-```shell> nohup python3 binlog_parse_clickhouse.py > from_mysql_to_clickhouse.log 2>&1 &```
+```shell> nohup python3 binlog_parse_clickhouse.py -f config.yaml > from_mysql_to_clickhouse.log 2>&1 &```
 
 
 

@@ -35,11 +35,11 @@ https://blog.csdn.net/mdh17322249/article/details/123966953
 
 #### 3) MySQL全量数据迁移至ClickHouse步骤：
 
-a) ```/usr/bin/mydumper -h 192.168.192.180 -u hechunyang -p 123456 -P 3306 --no-schemas -t 12 --csv -v 3 --regex '^hcy.user$' -o ./```
+a) ```/usr/bin/mydumper -h 192.168.192.180 -u 123456 -p 123456 -P 3306 --no-schemas -t 12 --csv -v 3 --regex '^yourDB.user$' -o ./```
 
 注：需要mydumper 0.12.3-3版本支持导出CSV格式
 
-b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.00000.dat```
+b) ```clickhouse-client --query="INSERT INTO yourDB.user FORMAT CSV" < yourDB.user.00000.dat```
 
 ### c) 或者使用mysql_to_clickhouse_sync.py工具（MySQL全量数据导入到ClickHouse里，默认并行10张表同时导出数据，每次轮询取1000条数据。）
 
@@ -47,13 +47,13 @@ b) ```clickhouse-client --query="INSERT INTO hcy.user FORMAT CSV" < hcy.user.000
 
 ##### 如果你说服不了开发对每张表增加自增主键ID，那么你要设置参数sql_generate_invisible_primary_key​​​
 ##### 开启这个参数，会在建表时，检查表中是否有主键，如果没有主键，则会自动创建。该参数非常实用，减少了DBA对sql语句表结构的审计。
-##### 参考 https://blog.51cto.com/hcymysql/5952924
+##### 参考 https://blog.51cto.com/yourDBmysql/5952924
 
 ### d) mysql_to_clickhouse_sync_pagination.py工具（MySQL全量数据导入到ClickHouse里，主键ID可以不自增。）
 
 ##### 注：没有自增主键的表，采用LIMIT offset, limit分页方式拉取数据。
 
-```shell> python3 mysql_to_clickhouse_sync.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password hechunyang --mysql_db hcy --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user hechunyang --clickhouse_password 123456 --clickhouse_database hcy --batch_size 1000 --max_workers 10```
+```shell> python3 mysql_to_clickhouse_sync.py --mysql_host 192.168.198.239 --mysql_port 3336 --mysql_user admin --mysql_password 123456 --mysql_db yourDB --clickhouse_host 192.168.176.204 --clickhouse_port 9000 --clickhouse_user 123456 --clickhouse_password 123456 --clickhouse_database yourDB --batch_size 1000 --max_workers 10```
 
 会在工具目录下，生成metadata.txt文件（将binlog文件名、位置点和GTID信息保存到metadata.txt文件中）
 

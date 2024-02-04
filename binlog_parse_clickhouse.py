@@ -26,47 +26,37 @@ from pymysqlreplication.event import QueryEvent
 from pymysqlreplication.event import GtidEvent
 from clickhouse_driver import Client
 import logging
+import yaml
+import argparse
 
-#################修改以下配置配置信息#################
-# 源 MySQL 8.0 数据库设置
-source_mysql_settings = {
-    "host": "192.168.198.239",
-    "port": 6666,
-    "user": "admin",
-    "passwd": "123456",
-    "database": "test",
-    "charset": "utf8mb4",
-}
+# 创建命令行参数解析器
+parser = argparse.ArgumentParser()
+# 添加-f/--file参数，用于指定db.yaml文件的路径
+parser.add_argument("-f", "--file", required=True, help="Path to db.yaml file")
 
-# 设置源MySQL Server-Id
-source_server_id = 66661
+# 解析命令行参数
+args = parser.parse_args()
 
-# 设置从源同步的binlog文件名和位置点，默认值为 mysql-bin.000001 和 4
-binlog_file = "mysql-bin.000001"
-binlog_pos = 4
+# 获取传入的db.yaml文件路径
+file_path = args.file
 
-# 设置同步忽略的表（支持正则表达式）
-#ignore_tables = ['t1', 'yy'] #表示忽略同步t1和yy两张表
-#ignore_prefixes = ['^user_.*$', '^opt_.*$'] #表示忽略user_和opt_前缀的所有表
+# 读取YAML配置文件
+with open(file_path, 'r') as file:
+    config = yaml.safe_load(file)
 
-# 设置只同步的表（支持正则表达式）
-#repl_tables = ['nba'] #表示只同步nba这一张表
-#repl_prefixes = ['^rsz_.*$'] #表示只同步rsz_前缀的所有表
+# 将YAML配置信息转换为变量
+source_mysql_settings = config.get('source_mysql_settings', {})
+source_server_id = config.get('source_server_id', None)
+binlog_file = config.get('binlog_file', '')
+binlog_pos = config.get('binlog_pos', 4)
+ignore_tables = config.get('ignore_tables', None)  # 默认值修改为None
+ignore_prefixes = config.get('ignore_prefixes', None)
+repl_tables = config.get('repl_tables', None)
+repl_prefixes = config.get('repl_prefixes', None)
+target_clickhouse_settings = config.get('target_clickhouse_settings', {})
+clickhouse_cluster_name = config.get('clickhouse_cluster_name', None)
+LOG_FILE = config.get('LOG_FILE', '')
 
-# 目标 ClickHouse 数据库设置
-target_clickhouse_settings = {
-    "host": "192.168.176.204",  # 修改为目标ClickHouse的IP地址或域名
-    "port": 9000,  # 修改为目标ClickHouse的端口号
-    "user": "admin",  # 修改为目标ClickHouse的用户名
-    "password": "123456",  # 修改为目标ClickHouse的密码
-    "database": "cktest",  # 修改为目标ClickHouse的数据库名
-}
-
-# 设置ClickHouse集群的名字，这样方便在所有节点上同时执行DDL操作
-# 通过select * from system.clusters命令查看集群的名字
-#clickhouse_cluster_name = "perftest_1shards_3replicas"
-
-LOG_FILE = "ck_repl_status.log"
 # 配置日志记录
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -471,4 +461,3 @@ signal.signal(signal.SIGINT, save_binlog_pos_on_termination)
 
 # 关闭连接
 atexit.register(target_conn.close)
-

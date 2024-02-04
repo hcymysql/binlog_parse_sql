@@ -144,9 +144,9 @@ def worker(table_name, table_bounds, mysql_config, clickhouse_config, batch_size
         batch_size = batch_size
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for start_id in range(min_id, max_id, batch_size):
-                end_id = start_id + batch_size
+                end_id = start_id + batch_size - 1
                 if end_id > max_id:
-                    end_id = max_id + 1
+                    end_id = max_id
                 records = read_from_mysql(table_name, start_id, end_id, mysql_config)
                 print(f"Retrieved {len(records)} records from MySQL table {table_name} between ID {start_id} and {end_id}")
                 if len(records) > 0:

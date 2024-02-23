@@ -109,8 +109,8 @@ def insert_into_clickhouse(table_name, records, clickhouse_config):
         ###调试使用
         ###logger.info(f"执行的SQL是：{query}")
     except Exception as e:
-        logger.error('Error SQL query:', query)  # 记录错误的SQL语句
-        logger.error('Error inserting records into ClickHouse:', e)
+        logger.error(f"Error SQL query: {query}")  # 记录错误的SQL语句
+        logger.error(f"Error inserting records into ClickHouse: {e}")
     finally:
         clickhouse_client.disconnect()
 

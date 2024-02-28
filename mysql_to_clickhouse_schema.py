@@ -8,29 +8,37 @@ import logging
 
 #################修改以下配置配置信息#################
 # 配置信息
-MYSQL_HOST = "192.168.198.239"
-MYSQL_PORT = 3336
+MYSQL_HOST = "192.168.176.204"
+MYSQL_PORT = 3306
 MYSQL_USER = "admin"
-MYSQL_PASSWORD = "hechunyang"
-MYSQL_DATABASE = "hcy"
+MYSQL_PASSWORD = "123456"
+MYSQL_DATABASE = "innodb_bts"
 
 CLICKHOUSE_HOST = "192.168.176.204"
 CLICKHOUSE_PORT = 9000
-CLICKHOUSE_USER = "hechunyang"
+CLICKHOUSE_USER = "admin"
 CLICKHOUSE_PASSWORD = "123456"
-CLICKHOUSE_DATABASE = "hcy"
+CLICKHOUSE_DATABASE = "test_bts"
 
 # 设置ClickHouse集群的名字，这样方便在所有节点上同时创建表引擎ReplicatedMergeTree
 # 通过select * from system.clusters命令查看集群的名字
 #clickhouse_cluster_name = "perftest_1shards_3replicas"
 
 # 设置表引擎
-TABLE_ENGINE = "MergeTree"
+TABLE_ENGINE = "MySQL('192.168.176.204:3306', 'innodb_bts', 'tablelink', 'admin', '123456')"
+"""
+说明：1) MySQL 表引擎可以提升复杂SQL查询性能，特别是对于小型到中型数据集，且执行频率不高的应用场景，例如BI报表凌晨跑批。
+     2) 权限要设置跟default用户一样，库名需要赋予ON *.*
+     3) tablelink为硬编码模板，后面要跟根据表名将其替换，这里需写死
+"""
+
+#TABLE_ENGINE = "MergeTree"
 #TABLE_ENGINE = "ReplicatedMergeTree"
 
 LOG_FILE = "convert_error.log"
 # 配置日志记录
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
 
 #################以下代码不用修改#################
 def convert_field_type(field_type):
@@ -73,10 +81,12 @@ def convert_field_type(field_type):
     else:
         raise ValueError(f"无法转化未知 MySQL 字段类型：{field_type}")
 
+
 def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhouse_conn, clickhouse_database):
     """
     将MySQL表结构转换为ClickHouse
     """
+    global TABLE_ENGINE
     # 获取MySQL表结构
     mysql_cursor = mysql_conn.cursor()
     mysql_cursor.execute(f"SHOW KEYS FROM {mysql_database}.{table_name} WHERE Key_name = 'PRIMARY'")
@@ -106,9 +116,21 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
 
     # 设置主键
     primary_key_str = ",".join(mysql_primary_key)
-    create_statement += f"PRIMARY KEY ({primary_key_str})"
+    if 'mysql' not in TABLE_ENGINE.lower():
+        create_statement += f"PRIMARY KEY ({primary_key_str})"
+    
+    if 'mysql' in TABLE_ENGINE.lower():
+        # 保存初始值
+        original_table_engine = TABLE_ENGINE
 
-    if TABLE_ENGINE == "MergeTree":
+        TABLE_ENGINE = TABLE_ENGINE.replace('tablelink', table_name)
+        create_statement = create_statement[:-1]
+        create_statement += ") ENGINE = " + TABLE_ENGINE
+
+        # 恢复为初始值
+        TABLE_ENGINE = original_table_engine
+
+    elif TABLE_ENGINE == "MergeTree":
         # 设置存储引擎为 MergeTree
         create_statement += ") ENGINE = MergeTree ORDER BY " + ','.join(mysql_primary_key)
     else:
@@ -119,12 +141,13 @@ def convert_mysql_to_clickhouse(mysql_conn, mysql_database, table_name, clickhou
     # 执行SQL语句
     try:
         clickhouse_cursor = clickhouse_conn.execute(create_statement)
+        # 输出ClickHouse表结构
+        print(f"ClickHouse create statement: {create_statement}" + "\n")
     except Exception as e:
-        logging.error(f"执行SQL语句失败：{create_statement}")
-        #logging.error(f"错误信息：{e}")
+        print(f"{table_name}表 - 执行SQL语句失败!详见当前目录下生成的错误日志. \n")
+        logging.error(f"{table_name}表 - 执行SQL语句失败：{create_statement} \n")
+        logging.error(f"错误信息：{e}")
 
-    # 输出ClickHouse表结构
-    # print(f"ClickHouse create statement: {create_statement}")
 
 def convert_mysql_database_to_clickhouse(mysql_conn, mysql_database, clickhouse_conn, clickhouse_database):
     """

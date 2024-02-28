@@ -176,5 +176,5 @@ if __name__ == "__main__":
     # 连接ClickHouse数据库
     clickhouse_conn = Client(host=CLICKHOUSE_HOST, port=CLICKHOUSE_PORT, user=CLICKHOUSE_USER, password=CLICKHOUSE_PASSWORD, database=CLICKHOUSE_DATABASE)
 
-    # 转化表结构
+    # 转换表结构
     convert_mysql_database_to_clickhouse(mysql_conn, MYSQL_DATABASE, clickhouse_conn, CLICKHOUSE_DATABASE)
